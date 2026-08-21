@@ -1,0 +1,81 @@
+databases:
+  - name: nepse-paper-trader-db
+    plan: free
+    databaseName: nepse_paper_trader
+    user: nepse
+
+services:
+  - type: web
+    name: nepse-paper-trader-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nepse-paper-trader-db
+          property: connectionString
+      - key: ENV
+        value: production
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "60"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+      - key: LOG_LEVEL
+        value: INFO
+      - key: API_V1_PREFIX
+        value: /api/v1
+      - key: MARKET_MODE
+        value: demo
+      - key: MARKET_TIMEZONE
+        value: Asia/Kathmandu
+      - key: MARKET_OPEN
+        value: "11:00"
+      - key: MARKET_CLOSE
+        value: "15:00"
+      - key: TRADING_DAYS
+        value: SUN,MON,TUE,WED,THU
+      - key: INITIAL_VIRTUAL_BALANCE
+        value: "1000000"
+      - key: BASE_CURRENCY
+        value: NPR
+      - key: FEE_COMMISSION_PCT
+        value: "0.36"
+      - key: FEE_REGULATORY_PCT
+        value: "0.015"
+      - key: FEE_SEBON_PCT
+        value: "0.015"
+      - key: FEE_SETTLEMENT_PCT
+        value: "0.01"
+      - key: DEMO_PRICE_VOLATILITY_PCT
+        value: "1.5"
+      - key: DEMO_TICK_INTERVAL_SECONDS
+        value: "5"
+      - key: RATE_LIMIT_LOGIN
+        value: 5/minute
+      - key: RATE_LIMIT_REGISTER
+        value: 3/minute
+      - key: RATE_LIMIT_ORDERS
+        value: 20/minute
+      - key: CREATE_DEMO_ACCOUNT
+        value: "false"
+
+  - type: web
+    name: nepse-paper-trader-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://nepse-paper-trader-api.onrender.com/api/v1

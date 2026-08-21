@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nepse
+      POSTGRES_PASSWORD: nepse_dev_password
+      POSTGRES_DB: nepse_paper_trader
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nepse -d nepse_paper_trader"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://nepse:nepse_dev_password@postgres:5432/nepse_paper_trader
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port $${PORT:-8000} --reload"
+
+  # frontend service is added in the frontend build phase — see
+  # docs/deployment.md once that phase lands.
+
+volumes:
+  postgres_data:

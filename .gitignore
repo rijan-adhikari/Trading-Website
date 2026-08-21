@@ -1,0 +1,46 @@
+# --- Environment ---
+.env
+.env.local
+.env.*.local
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+*.log
+
+# --- Node / Frontend ---
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Docker ---
+*.pid
+
+# --- Database ---
+*.sqlite3
+*.db
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.venv/
+venv/

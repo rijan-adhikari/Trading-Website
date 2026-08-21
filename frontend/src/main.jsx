@@ -1,0 +1,179 @@
+import { StrictMode, useEffect, useState } from 'react'
+import { createRoot } from 'react-dom/client'
+import { Activity, ArrowUpRight, Bell, Check, ChevronDown, CircleHelp, Eye, LogIn, LogOut, Menu, Search, Settings2, SlidersHorizontal, Sparkles, UserPlus, Wallet, X } from 'lucide-react'
+import './styles.css'
+
+const watchlist = [
+  { symbol: 'NABIL', name: 'Nabil Bank', price: '548.20', change: '+2.41%', direction: 'up' },
+  { symbol: 'NICA', name: 'NIC Asia Bank', price: '712.80', change: '+1.06%', direction: 'up' },
+  { symbol: 'SCB', name: 'Standard Chartered', price: '628.00', change: '-0.84%', direction: 'down' },
+  { symbol: 'HBL', name: 'Himalayan Bank', price: '265.40', change: '+0.57%', direction: 'up' },
+  { symbol: 'SHIVM', name: 'Shivam Cement', price: '532.00', change: '-1.28%', direction: 'down' },
+]
+
+const tickerItems = [...watchlist, { symbol: 'NEPSE', name: 'NEPSE Index', price: '2,118.47', change: '+0.38%', direction: 'up' }]
+
+function SkylineChart({ candles = [] }) {
+  const points = candles.length ? candles.map((candle, index) => {
+    const min = Math.min(...candles.map(item => item.low))
+    const max = Math.max(...candles.map(item => item.high))
+    const x = (index / Math.max(candles.length - 1, 1)) * 900
+    const y = 260 - ((candle.close - min) / Math.max(max - min, 1)) * 175
+    return `${x.toFixed(1)} ${y.toFixed(1)}`
+  }) : []
+  const livePath = points.length ? `M${points.join(' L')}` : ''
+  const liveArea = points.length ? `${livePath} L900 300 L0 300 Z` : ''
+  return (
+    <div className="skyline-wrap" aria-label="NEPSE skyline price chart">
+      <div className="chart-grid" />
+      <svg className="skyline" viewBox="0 0 900 300" preserveAspectRatio="none" role="img">
+        <defs>
+          <linearGradient id="mountainFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#6C5CE7" stopOpacity="0.46" />
+            <stop offset="100%" stopColor="#6C5CE7" stopOpacity="0.02" />
+          </linearGradient>
+          <linearGradient id="ridgeLine" x1="0" x2="1">
+            <stop offset="0%" stopColor="#3DD68C" />
+            <stop offset="58%" stopColor="#6C5CE7" />
+            <stop offset="100%" stopColor="#E8B44D" />
+          </linearGradient>
+        </defs>
+        <path className="mountain-area" d={liveArea || 'M0 249 L38 236 L70 248 L108 190 L139 232 L176 170 L208 216 L245 100 L279 213 L312 178 L349 226 L387 146 L421 232 L455 204 L492 242 L526 125 L562 229 L597 191 L635 237 L675 90 L710 229 L747 173 L781 218 L820 141 L852 223 L900 186 L900 300 L0 300 Z'} fill="url(#mountainFill)" />
+        <path className="mountain-ridge" d={livePath || 'M0 249 L38 236 L70 248 L108 190 L139 232 L176 170 L208 216 L245 100 L279 213 L312 178 L349 226 L387 146 L421 232 L455 204 L492 242 L526 125 L562 229 L597 191 L635 237 L675 90 L710 229 L747 173 L781 218 L820 141 L852 223 L900 186'} fill="none" stroke="url(#ridgeLine)" strokeWidth="3" />
+        <g className="candle-marks">
+          <path d="M108 190 V245 M101 205 H115" /><path d="M176 170 V231 M169 187 H183" /><path d="M245 100 V220 M237 128 H253" /><path d="M387 146 V228 M379 163 H395" /><path d="M526 125 V231 M518 145 H534" /><path d="M675 90 V230 M667 111 H683" /><path d="M820 141 V222 M812 159 H828" />
+        </g>
+      </svg>
+      <div className="chart-labels"><span>10:00</span><span>11:30</span><span>13:00</span><span>14:30</span><span>15:00</span></div>
+      <span className="chart-tooltip"><strong>{candles.length ? candles[candles.length - 1].close.toFixed(2) : '2,118.47'}</strong><small>{candles.length ? 'API / SIMULATED OHLCV' : 'NEPSE / 15:00'}</small></span>
+    </div>
+  )
+}
+
+function Ticker() {
+  return <div className="ticker" aria-label="Live market ticker"><div className="ticker-track">{tickerItems.concat(tickerItems).map((item, index) => <span className="ticker-item" key={`${item.symbol}-${index}`}><b>{item.symbol}</b><span>{item.price}</span><em className={item.direction}>{item.change}</em></span>)}</div></div>
+}
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+
+async function apiRequest(path, options = {}) {
+  let response
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      headers: { 'Content-Type': 'application/json', ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}) },
+      ...options,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    })
+  } catch {
+    throw new Error(`Cannot reach the API at ${API_BASE}. Start the backend or set VITE_API_URL.`)
+  }
+  const result = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(result.error?.message || 'Request failed.')
+  return result.data
+}
+
+function AuthModal({ mode, onClose, onAuthenticated }) {
+  const [formMode, setFormMode] = useState(mode)
+  const [form, setForm] = useState({ name: '', username: '', email: '', password: '' })
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const submit = async (event) => {
+    event.preventDefault(); setError(''); setBusy(true)
+    try {
+      const data = await apiRequest(`/auth/${formMode === 'login' ? 'login' : 'register'}`, { method: 'POST', body: formMode === 'login' ? { email: form.email, password: form.password } : form })
+      localStorage.setItem('nepse_access_token', data.access_token)
+      localStorage.setItem('nepse_user', JSON.stringify(data.user))
+      onAuthenticated(data.user)
+    } catch (requestError) { setError(requestError.message) } finally { setBusy(false) }
+  }
+  return <div className="modal-backdrop" role="dialog" aria-modal="true"><div className="auth-modal"><button className="modal-close" onClick={onClose} aria-label="Close"><X size={18} /></button><p className="eyebrow"><span className="pulse-dot" /> NEPSE / PAPER TRADER</p><h2>{formMode === 'login' ? 'Welcome back.' : 'Start your practice.'}</h2><p className="modal-copy">{formMode === 'login' ? 'Sign in to your paper-trading terminal.' : 'Create an account and receive NPR 1,000,000 in virtual capital.'}</p><form onSubmit={submit}>{formMode === 'register' && <><label>Full name<input required value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} /></label><label>Username<input required value={form.username} onChange={event => setForm({ ...form, username: event.target.value })} /></label></>}<label>Email<input required type="email" value={form.email} onChange={event => setForm({ ...form, email: event.target.value })} /></label><label>Password<input required type="password" minLength="8" value={form.password} onChange={event => setForm({ ...form, password: event.target.value })} /></label>{error && <p className="form-error">{error}</p>}<button className="primary-button form-submit" disabled={busy}>{formMode === 'login' ? <LogIn size={16} /> : <UserPlus size={16} />}{busy ? 'Working...' : formMode === 'login' ? 'Sign in' : 'Create account'}</button></form><button className="switch-auth" onClick={() => { setFormMode(formMode === 'login' ? 'register' : 'login'); setError('') }}>{formMode === 'login' ? 'Need an account? Create one' : 'Already have an account? Sign in'}</button></div></div>
+}
+
+function AdminPanel() {
+  const [users, setUsers] = useState([])
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState('')
+  const token = localStorage.getItem('nepse_access_token')
+  useEffect(() => { apiRequest('/admin/users', { token }).then(setUsers).catch(requestError => setError(requestError.message)) }, [token])
+  const toggleUser = async (user) => { setError(''); setSaved(''); try { const updated = await apiRequest(`/admin/users/${user.id}`, { method: 'PATCH', token, body: { is_active: !user.is_active } }); setUsers(users.map(item => item.id === updated.id ? updated : item)); setSaved(`${updated.username} status saved.`) } catch (requestError) { setError(requestError.message) } }
+  return <section className="admin-page"><div className="admin-heading"><div><p className="eyebrow"><span className="pulse-dot" /> ADMIN CONSOLE</p><h1>Keep the market <span>honest.</span></h1><p className="hero-copy">Manage account access and review who can use the paper-trading simulation.</p></div><div className="admin-stat"><span>Registered accounts</span><strong className="metric-number">{users.length}</strong></div></div><div className="panel admin-users"><div className="panel-heading compact"><div><p className="eyebrow">ACCOUNT DIRECTORY</p><h2>User access</h2></div><span className="admin-note"><Check size={14} /> Changes are audit-logged</span></div>{error && <p className="form-error admin-message">{error}</p>}{saved && <p className="saved-message">{saved}</p>}<div className="admin-table"><div className="table-head"><span>USER</span><span>ROLE</span><span>CREATED</span><span>STATUS</span><span>ACTION</span></div>{users.map(user => <div className="admin-row" key={user.id}><span><b>{user.name}</b><small>{user.email}</small></span><span className="mono">{user.role}</span><span className="mono">{new Date(user.created_at).toLocaleDateString()}</span><span className={user.is_active ? 'positive' : 'negative'}>{user.is_active ? 'ACTIVE' : 'SUSPENDED'}</span><button className="status-button" onClick={() => toggleUser(user)}>{user.is_active ? 'Suspend' : 'Reactivate'}</button></div>)}</div></div></section>
+}
+
+function MarketsPage({ onSelect }) {
+  const [query, setQuery] = useState('')
+  const [onlyGainers, setOnlyGainers] = useState(false)
+  const filtered = watchlist.filter(item => item.symbol.toLowerCase().includes(query.toLowerCase()) && (!onlyGainers || item.direction === 'up'))
+  return <section className="app-page"><div className="page-heading"><div><p className="eyebrow"><span className="pulse-dot" /> SIMULATED MARKET</p><h1>Find your <span>next move.</span></h1><p className="hero-copy">Explore the NEPSE universe with transparent demo prices. Select an instrument to open its chart.</p></div><span className="data-badge">DEMO DATA / LIVE UI</span></div><div className="market-tools"><label className="search-field"><Search size={16} /><input placeholder="Search symbol or company" value={query} onChange={event => setQuery(event.target.value)} /></label><button className={onlyGainers ? 'filter-button active-filter' : 'filter-button'} onClick={() => setOnlyGainers(!onlyGainers)}><SlidersHorizontal size={15} /> {onlyGainers ? 'Gainers only' : 'All stocks'}</button></div><div className="market-grid">{filtered.map(item => <button className="market-card panel" key={item.symbol} onClick={() => onSelect(item.symbol)}><div className="market-card-top"><span className="company-badge">{item.symbol[0]}</span><span className="market-change"><em className={item.direction}>{item.change}</em></span></div><p className="eyebrow">{item.symbol}</p><h2>{item.name}</h2><strong className="metric-number">NPR {item.price}</strong><div className="mini-chart"><span className={item.direction} /></div><small>View chart <ArrowUpRight size={13} /></small></button>)}</div>{filtered.length === 0 && <div className="empty-state panel"><Search size={22} /><h2>No matching stocks</h2><p>Try a symbol such as NABIL or NICA.</p></div>}</section>
+}
+
+function PortfolioPage({ user }) {
+  const [portfolio, setPortfolio] = useState(null)
+  const [error, setError] = useState('')
+  useEffect(() => { if (user) apiRequest('/portfolio', { token: localStorage.getItem('nepse_access_token') }).then(setPortfolio).catch(requestError => setError(requestError.message)) }, [user])
+  if (!user) return <section className="app-page"><div className="empty-state panel"><Wallet size={22} /><h2>Sign in to view your portfolio</h2><p>Your virtual balance and positions are private to your account.</p></div></section>
+  const cash = portfolio?.cash_balance ?? '1000000.00'
+  const total = portfolio?.total_value ?? cash
+  const positions = portfolio?.positions || []
+  const allocation = [{ label: 'NABIL', value: 31, color: '#6C5CE7' }, { label: 'NICA', value: 24, color: '#3DD68C' }, { label: 'SCB', value: 18, color: '#E8B44D' }, { label: 'Cash', value: 27, color: '#394254' }]
+  return <section className="app-page"><div className="page-heading"><div><p className="eyebrow">CAPITAL / OVERVIEW</p><h1>Your practice <span>portfolio.</span></h1><p className="hero-copy">A clear view of virtual capital, allocation, and performance. Nothing here touches real securities.</p></div><span className="data-badge">DATABASE PORTFOLIO</span></div>{error && <p className="form-error">{error}</p>}<div className="portfolio-summary"><div className="panel balance-card"><span>Net portfolio value</span><strong className="metric-number">NPR {Number(total).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong><em className="positive">Persisted account value</em></div><div className="panel balance-card"><span>Unrealized P&amp;L</span><strong className="metric-number positive">+NPR {Number(portfolio?.unrealized_pl || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong><small>{positions.length} open positions</small></div><div className="panel balance-card"><span>Cash available</span><strong className="metric-number">NPR {Number(cash).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong><small>Available buying power</small></div></div><div className="portfolio-layout"><div className="panel allocation-panel"><div className="panel-heading compact"><div><p className="eyebrow">POSITIONS</p><h2>Capital at work</h2></div></div><div className="position-table">{positions.length ? positions.map(position => <div className="position-row" key={position.symbol}><span><b>{position.symbol}</b><small>{position.company_name}</small></span><span className="mono">{position.quantity}</span><span className="mono">{Number(position.average_price).toFixed(2)}</span><span className="mono">{Number(position.current_price).toFixed(2)}</span><span className="positive mono">+{Number(position.unrealized_pl).toFixed(2)}</span></div>) : <div className="empty-state"><p>No positions yet. Place a paper order to begin.</p></div>}</div></div><div className="panel performance-panel"><p className="eyebrow">ACCOUNT LEDGER</p><h2>Realized P&amp;L</h2><strong className="metric-number positive">NPR {Number(portfolio?.realized_pl || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong><p className="performance-note">All orders and cash movements are stored in the backend database.</p></div></div></section>
+}
+
+function OrdersPage({ user, onSignIn }) {
+  const [side, setSide] = useState('BUY')
+  const [symbol, setSymbol] = useState('NABIL')
+  const [quantity, setQuantity] = useState('10')
+  const [orders, setOrders] = useState([])
+  const [error, setError] = useState('')
+  useEffect(() => { if (user) apiRequest('/orders', { token: localStorage.getItem('nepse_access_token') }).then(setOrders).catch(requestError => setError(requestError.message)) }, [user])
+  const submitOrder = async event => { event.preventDefault(); if (!user) { onSignIn(); return } setError(''); try { const order = await apiRequest('/orders', { method: 'POST', token: localStorage.getItem('nepse_access_token'), body: { symbol, side, quantity: Number(quantity), order_type: 'MARKET' } }); setOrders([order, ...orders]); setQuantity('10') } catch (requestError) { setError(requestError.message) } }
+  return <section className="app-page"><div className="page-heading"><div><p className="eyebrow"><span className="pulse-dot" /> PAPER EXECUTION</p><h1>Make a <span>practice order.</span></h1><p className="hero-copy">Orders are simulated, validated, and persisted in your virtual portfolio database.</p></div><span className="data-badge">DATABASE ORDERS</span></div>{error && <p className="form-error">{error}</p>}<div className="order-layout"><form className="panel order-ticket" onSubmit={submitOrder}><div className="panel-heading compact"><div><p className="eyebrow">ORDER TICKET</p><h2>New order</h2></div></div><div className="segmented"><button type="button" className={side === 'BUY' ? 'segment-active buy-segment' : ''} onClick={() => setSide('BUY')}>Buy</button><button type="button" className={side === 'SELL' ? 'segment-active sell-segment' : ''} onClick={() => setSide('SELL')}>Sell</button></div><label>Instrument<select value={symbol} onChange={event => setSymbol(event.target.value)}>{watchlist.map(item => <option key={item.symbol}>{item.symbol}</option>)}</select></label><label>Quantity<input type="number" min="1" required value={quantity} onChange={event => setQuantity(event.target.value)} /></label><div className="ticket-total"><span>Estimated value</span><strong className="metric-number">NPR {(Number(quantity || 0) * Number(watchlist.find(item => item.symbol === symbol)?.price || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></div><button className={side === 'BUY' ? 'primary-button form-submit' : 'sell-button form-submit'} type="submit">{user ? (side === 'BUY' ? 'Place buy order' : 'Place sell order') : 'Sign in to place order'} <ArrowUpRight size={15} /></button><small className="ticket-disclaimer">Simulation only. No real trade will be placed.</small></form><div className="panel order-history"><div className="panel-heading compact"><div><p className="eyebrow">ACTIVITY LEDGER</p><h2>Recent orders</h2></div><span className="admin-note"><Check size={14} /> Database saved</span></div><div className="order-list">{orders.map(order => <div className="order-row" key={order.id}><span><b>{order.symbol} <em className={order.side === 'BUY' ? 'positive' : 'negative'}>{order.side}</em></b><small>{order.id.slice(0, 8)} / {order.quantity} shares</small></span><span className="mono">NPR {Number(order.average_fill_price || 0).toFixed(2)}</span><span className={order.status === 'FILLED' ? 'positive' : 'gold-text'}>{order.status}</span></div>)}</div></div></div></section>
+}
+
+function App() {
+  const [activeNav, setActiveNav] = useState('Overview')
+  const [selected, setSelected] = useState('NEPSE')
+  const [range, setRange] = useState('1D')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [clock, setClock] = useState('15:00:00')
+  const [candles, setCandles] = useState([])
+  const [authMode, setAuthMode] = useState(null)
+  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('nepse_user') || 'null'))
+
+  useEffect(() => {
+    const timer = setInterval(() => setClock(new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Kathmandu' })), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    if (selected === 'NEPSE') { setCandles([]); return }
+    apiRequest(`/market/stocks/${selected}/prices`).then(data => setCandles(data.candles)).catch(() => setCandles([]))
+  }, [selected])
+
+  return (
+    <div className="app-shell">
+      <Ticker />
+      <header className="topbar">
+        <button className="menu-button" aria-label="Open navigation" onClick={() => setMenuOpen(!menuOpen)}><Menu size={20} /></button>
+        <a className="brand" href="#top"><span className="brand-mark">N</span><span>NEPSE<span className="brand-slash">/</span></span><small>PAPER TRADER</small></a>
+        <nav className={menuOpen ? 'main-nav open' : 'main-nav'}>{['Overview', 'Markets', 'Portfolio', 'Orders', ...(user?.role === 'ADMIN' ? ['Admin'] : [])].map(item => <button className={activeNav === item ? 'nav-active' : ''} key={item} onClick={() => { setActiveNav(item); setMenuOpen(false) }}>{item}</button>)}</nav>
+        <div className="top-actions"><button className="icon-button" aria-label="Search"><Search size={18} /></button><button className="icon-button" aria-label="Notifications"><Bell size={18} /><i /></button>{user ? <button className="avatar" aria-label="Log out" onClick={() => { localStorage.clear(); setUser(null); setActiveNav('Overview') }}>{user.username?.slice(0, 2).toUpperCase() || 'ME'}</button> : <><button className="auth-link" onClick={() => setAuthMode('login')}>Sign in</button><button className="primary-button compact-button" onClick={() => setAuthMode('register')}><UserPlus size={14} /> Join</button></>}</div>
+      </header>
+
+      <main id="top">{activeNav === 'Admin' && user?.role === 'ADMIN' ? <AdminPanel /> : activeNav === 'Markets' ? <MarketsPage onSelect={symbol => { setSelected(symbol); setActiveNav('Overview') }} /> : activeNav === 'Portfolio' ? <PortfolioPage user={user} /> : activeNav === 'Orders' ? <OrdersPage user={user} onSignIn={() => setAuthMode('login')} /> : <>
+        <section className="hero-intro reveal-one"><div><p className="eyebrow"><span className="pulse-dot" /> MARKET OPEN <span className="mono">{clock} NPT</span></p><h1>Trade the <span>mountains.</span></h1><p className="hero-copy">A focused paper-trading terminal for the Nepal Stock Exchange. Practice with NPR 1,000,000 in virtual capital.</p></div><button className="primary-button" onClick={() => setActiveNav('Markets')}><Sparkles size={16} /> Explore markets <ChevronDown size={15} /></button></section>
+
+        <section className="metric-strip reveal-two"><div><span>Portfolio value</span><strong className="metric-number">NPR 1,024,680.00</strong><em className="positive"><ArrowUpRight size={14} /> 2.47% today</em></div><div><span>Available cash</span><strong className="metric-number">NPR 842,150.00</strong><small>82.2% buying power</small></div><div><span>Open positions</span><strong className="metric-number">08</strong><small>03 gaining today</small></div><div className="signature-metric"><span>Market pulse</span><strong><Activity size={17} /> Bullish</strong><small>NEPSE +0.38%</small></div></section>
+
+        <section className="workspace reveal-three"><div className="chart-panel panel"><div className="panel-heading"><div><p className="eyebrow">MARKET PULSE / {selected}</p><h2>{selected === 'NEPSE' ? 'NEPSE Index' : watchlist.find(item => item.symbol === selected)?.name}</h2></div><div className="chart-value"><strong className="metric-number">{selected === 'NEPSE' ? '2,118.47' : watchlist.find(item => item.symbol === selected)?.price}</strong><em className="positive">+8.02 <small>(+0.38%)</small></em></div></div><SkylineChart candles={candles} /><div className="chart-footer"><div className="range-tabs">{['1D', '1W', '1M', '3M', '1Y'].map(item => <button className={range === item ? 'selected-range' : ''} onClick={() => setRange(item)} key={item}>{item}</button>)}</div><span className="chart-legend"><i /> {candles.length ? 'API simulated OHLCV' : 'Simulated market data'} <CircleHelp size={14} /></span></div></div>
+          <aside className="watch-panel panel"><div className="panel-heading compact"><div><p className="eyebrow">YOUR RADAR</p><h2>Watchlist</h2></div><button className="icon-button" onClick={() => setActiveNav('Markets')} aria-label="Filter watchlist"><SlidersHorizontal size={17} /></button></div><div className="watch-list">{watchlist.map(item => <button className={selected === item.symbol ? 'watch-row active-row' : 'watch-row'} key={item.symbol} onClick={() => setSelected(item.symbol)}><span className="company-badge">{item.symbol.slice(0, 1)}</span><span className="company-name"><b>{item.symbol}</b><small>{item.name}</small></span><span className="watch-price"><b className="mono">{item.price}</b><em className={item.direction}>{item.change}</em></span></button>)}</div><button className="text-button" onClick={() => setActiveNav('Markets')}>View all markets <ArrowUpRight size={15} /></button></aside></section>
+
+        <section className="lower-grid reveal-four"><div className="panel positions-panel"><div className="panel-heading compact"><div><p className="eyebrow">CAPITAL AT WORK</p><h2>Open positions</h2></div><button className="text-button" onClick={() => setActiveNav('Portfolio')}>Manage <ArrowUpRight size={15} /></button></div><div className="position-table"><div className="table-head"><span>ASSET</span><span>QTY</span><span>AVG. PRICE</span><span>LAST PRICE</span><span>DAY P&amp;L</span></div>{watchlist.slice(0, 3).map((item, index) => <div className="position-row" key={item.symbol}><span><b>{item.symbol}</b><small>{item.name}</small></span><span className="mono">{[120, 80, 45][index]}</span><span className="mono">{['521.40', '704.10', '634.20'][index]}</span><span className="mono">{item.price}</span><span className={item.direction === 'up' ? 'positive mono' : 'negative mono'}>{item.direction === 'up' ? '+' : '-'}{['3,216.00', '696.00', '279.00'][index]}</span></div>)}</div></div><div className="panel insight-panel"><div className="insight-icon"><Wallet size={19} /></div><p className="eyebrow">TRADER'S NOTE</p><h2>Consistency compounds.</h2><p>Your strongest session was Tuesday. You stayed inside your risk band and let the position breathe.</p><button className="secondary-button" onClick={() => setActiveNav('Orders')}>Review your orders <ArrowUpRight size={15} /></button></div></section>
+      </>}</main>
+      <footer><span>NEPSE PAPER TRADER <i /> SIMULATION ONLY</span><span>Made by Rijan Adhikari <i /> <a className="contact-link" href="mailto:business.rijan.np@gmail.com">business.rijan.np@gmail.com</a></span><span><Settings2 size={14} /> System nominal</span></footer>
+      {!user && <button className="floating-auth" onClick={() => setAuthMode('login')}><LogIn size={15} /> Sign in to trade</button>}
+      {authMode && <AuthModal mode={authMode} onClose={() => setAuthMode(null)} onAuthenticated={authenticatedUser => { setUser(authenticatedUser); setAuthMode(null) }} />}
+    </div>
+  )
+}
+
+createRoot(document.getElementById('root')).render(<StrictMode><App /></StrictMode>)

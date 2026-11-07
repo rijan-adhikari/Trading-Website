@@ -193,3 +193,10 @@ provider has been explicitly connected and documented as such.
 ## License
 
 MIT (see `LICENSE`).
+
+## Author
+
+Developed by **[Rijan Adhikari](https://github.com/rijan-adhikari)**.
+
+- Portfolio: https://adhikari-rijan.onrender.com/
+- GitHub: https://github.com/rijan-adhikari

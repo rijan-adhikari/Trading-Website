@@ -155,7 +155,7 @@ The Blueprint currently uses Free Render Postgres to avoid creating a paid resou
 ## Security notes
 
 - Never commit `.env`, API keys, database URLs or production secrets.
-- Production requires long random `SECRET_KEY` and `JWT_SECRET` values and a PostgreSQL `DATABASE_URL`.
+- Production requires a long random `JWT_SECRET` and a PostgreSQL `DATABASE_URL`.
 - The frontend stores JWTs in browser localStorage. This is convenient for the MVP but increases exposure if an XSS vulnerability is introduced.
 - Logout currently removes browser tokens only; previously issued refresh tokens remain valid until expiry.
 - Admin endpoints enforce the ADMIN role server-side. Do not grant this role to untrusted users.

@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
@@ -85,11 +85,13 @@ def health():
 
 
 @app.get("/ready", tags=["system"])
-def ready():
+def ready(response: Response):
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         db_ok = True
     except Exception:
         db_ok = False
+    if not db_ok:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return {"status": "ready" if db_ok else "not_ready", "database": db_ok}

@@ -89,6 +89,8 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
         if self.ENV.lower() == "production":
+            if self.DATABASE_URL.startswith("sqlite"):
+                raise ValueError("Production requires a persistent PostgreSQL DATABASE_URL")
             placeholders = {
                 "dev-secret-key-change-me",
                 "dev-jwt-secret-change-me",

@@ -35,7 +35,6 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./nepse_paper_trader.db"
 
     # --- Security ---
-    SECRET_KEY: str = "dev-secret-key-change-me"
     JWT_SECRET: str = "dev-jwt-secret-change-me"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
@@ -59,10 +58,7 @@ class Settings(BaseSettings):
     FEE_SETTLEMENT_PCT: Decimal = Decimal("0.01")
 
     # --- Market data ---
-    MARKET_MODE: str = "demo"  # "demo" | "real" (future)
-    MARKET_API_BASE_URL: str = ""
-    MARKET_API_KEY: str = ""
-    MARKET_DATA_DELAY_SECONDS: int = 0
+    MARKET_MODE: str = "demo"  # demo-only release
     MARKET_TIMEZONE: str = "Asia/Kathmandu"
     MARKET_OPEN: str = "11:00"
     MARKET_CLOSE: str = "15:00"
@@ -71,10 +67,6 @@ class Settings(BaseSettings):
     @property
     def trading_days_list(self) -> List[str]:
         return [d.strip().upper() for d in self.TRADING_DAYS.split(",") if d.strip()]
-
-    # --- Demo market engine ---
-    DEMO_PRICE_VOLATILITY_PCT: Decimal = Decimal("1.5")
-    DEMO_TICK_INTERVAL_SECONDS: int = 5
 
     # --- Rate limiting ---
     RATE_LIMIT_LOGIN: str = "5/minute"
@@ -87,13 +79,11 @@ class Settings(BaseSettings):
             if self.DATABASE_URL.startswith("sqlite"):
                 raise ValueError("Production requires a persistent PostgreSQL DATABASE_URL")
             placeholders = {
-                "dev-secret-key-change-me",
                 "dev-jwt-secret-change-me",
-                "change-this-to-a-long-random-string",
                 "change-this-to-a-different-long-random-string",
             }
-            if (self.SECRET_KEY in placeholders or self.JWT_SECRET in placeholders or len(self.SECRET_KEY) < 32 or len(self.JWT_SECRET) < 32):
-                raise ValueError("SECRET_KEY and JWT_SECRET must each be at least 32 characters in production")
+            if self.JWT_SECRET in placeholders or len(self.JWT_SECRET) < 32:
+                raise ValueError("JWT_SECRET must be at least 32 characters in production")
         if self.MARKET_MODE.lower() != "demo":
             raise ValueError("Only MARKET_MODE=demo is supported until a licensed market-data provider is integrated")
         return self

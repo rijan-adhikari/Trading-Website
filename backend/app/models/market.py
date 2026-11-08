@@ -10,8 +10,9 @@ MONEY = Numeric(18, 4)
 
 
 class MarketPrice(UUIDPrimaryKeyMixin, Base):
-    """One OHLCV candle for a stock. Used to render price/volume charts
-    across 1D/1W/1M/3M/6M/1Y/ALL timeframes.
+    """Reserved storage model for historical OHLCV candles. The current
+    market endpoint generates simulated candles in memory and does not write
+    rows to this table.
     """
     __tablename__ = "market_prices"
 
@@ -30,10 +31,9 @@ class MarketPrice(UUIDPrimaryKeyMixin, Base):
 
 
 class MarketSession(UUIDPrimaryKeyMixin, Base):
-    """A trading-day record used by MarketSessionService to answer
-    is_market_open() / get_market_status() without hardcoding schedule
-    logic across the app. Generated/looked up from config.MARKET_* settings;
-    this table lets admins override a specific date (e.g. public holiday).
+    """Reserved storage model for future exchange-session and holiday
+    overrides. This release does not implement a market-session service or
+    enforce trading hours during paper-order execution.
     """
     __tablename__ = "market_sessions"
 

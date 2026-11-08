@@ -44,7 +44,7 @@ def register_and_get_token(client):
         json={
             "name": "Test Trader",
             "username": "test_trader",
-            "email": "trader@example.test",
+            "email": "trader@example.com",
             "password": "PaperTrade123!",
         },
     )

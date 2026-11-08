@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./nepse_paper_trader.db"
 
     # --- Security ---
-    JWT_SECRET: str = "dev-jwt-secret-change-me"
+    JWT_SECRET: str = "dev-jwt-secret-change-me-please-use-env"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -80,6 +80,7 @@ class Settings(BaseSettings):
                 raise ValueError("Production requires a persistent PostgreSQL DATABASE_URL")
             placeholders = {
                 "dev-jwt-secret-change-me",
+                "dev-jwt-secret-change-me-please-use-env",
                 "change-this-to-a-different-long-random-string",
             }
             if self.JWT_SECRET in placeholders or len(self.JWT_SECRET) < 32:

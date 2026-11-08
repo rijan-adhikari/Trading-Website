@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     APP_NAME: str = "NEPSE Paper Trader"
 
     # --- Database ---
-    # SQLite keeps a fresh checkout runnable locally; Render overrides this
-    # with its managed PostgreSQL connection string.
+    # SQLite is for local development only. Production supplies a persistent
+    # PostgreSQL URL (Neon Free is the documented zero-cost hosted option).
     DATABASE_URL: str = "sqlite:///./nepse_paper_trader.db"
 
     # --- Security ---

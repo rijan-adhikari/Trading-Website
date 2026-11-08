@@ -19,6 +19,7 @@ The Blueprint pins the API runtime to Python 3.12.16, matching CI, and generates
 The Blueprint intentionally uses Render's Free PostgreSQL plan to avoid silently creating a paid resource. This is suitable for a temporary demo, **not a durable production launch**:
 
 - Free Render Postgres databases expire 30 days after creation. After expiry, there is a 14-day upgrade grace period before deletion.
+- Free Postgres has no backups or managed connection pooling; Render can perform maintenance or restart it.
 - Free web services spin down after 15 minutes without inbound traffic and can take about a minute to wake.
 - Free web services have ephemeral local filesystems; the application database must remain in PostgreSQL.
 

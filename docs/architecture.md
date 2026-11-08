@@ -1,94 +1,70 @@
-# Architecture — NEPSE Paper Trader
+# Architecture
 
-## 1. Overview
+## Product boundary
 
-NEPSE Paper Trader is a full-stack paper-trading simulator. Users trade
-NEPSE-listed stocks with virtual money (default NPR 1,000,000 starting
-balance). No real securities transactions ever occur; all market data is
-either clearly labeled demo/simulated data or, in a future phase, sourced
-from a real provider behind the same abstraction.
+NEPSE Paper Trader is an educational paper-trading MVP. The current market source is a five-symbol in-code demo fixture with generated OHLCV candles. There is no broker integration and no licensed NEPSE market-data provider.
 
-## 2. Tech stack
+## Runtime components
 
-| Layer      | Choice                                   |
-|------------|-------------------------------------------|
-| Backend    | Python 3.12, FastAPI, SQLAlchemy 2.0, Alembic |
-| Database   | PostgreSQL 16                             |
-| Auth       | JWT (access + refresh), Argon2 password hashing |
-| Frontend   | React + Vite + TypeScript (Phase 8)       |
-| Charts     | Recharts (Phase 8)                        |
-| Containers | Docker + docker-compose                   |
+- **React + Vite frontend**: authentication modal, simulated market list/chart, order ticket, portfolio view and basic admin screen.
+- **FastAPI backend**: JSON API, request validation, authentication dependencies, rate limiting and error envelope.
+- **SQLAlchemy 2 + Alembic**: relational persistence and schema migrations.
+- **PostgreSQL**: required for production. SQLite is allowed only for local development.
+- **Render**: API web service, static frontend and managed PostgreSQL, defined in `render.yaml`.
 
-## 3. Layered backend architecture
+## Backend structure
 
-```
-api/          → FastAPI routers. Thin — parse request, call a service, return SuccessResponse.
-schemas/      → Pydantic request/response models. Validation lives here (and in services for business rules).
-services/     → Business logic. AuthService, OrderExecutionService, PortfolioService, etc.
-repositories/ → DB access, one per aggregate root (UserRepository, StockRepository, ...).
-models/       → SQLAlchemy ORM models — the schema, nothing else.
-middleware/   → Cross-cutting request handling (rate limiting is wired in main.py via slowapi).
-utils/        → security.py (hashing/JWT), errors.py (API error types).
-```
-
-Rule: routes never touch the DB directly, and services never know about
-HTTP (no `Request`/`Response` objects) — that keeps trading logic testable
-without spinning up FastAPI.
-
-## 4. Authentication & authorization
-
-- Registration hashes the password with Argon2, creates the `User`, a
-  funded `Portfolio`, and a default `Watchlist` in one DB transaction.
-- Login issues a short-lived access token (60 min default) and a
-  longer-lived refresh token (7 days default), both JWTs signed with
-  `JWT_SECRET`.
-- `get_current_user` (in `app/api/deps.py`) is the **only** way a route
-  determines the caller's identity — it decodes the bearer token and loads
-  the user from the DB. Routes/services never trust a `user_id` passed in
-  the request body or query string.
-- `require_admin` gates admin-only routes.
-
-## 5. Market data abstraction
-
-```
-MarketDataProvider (interface, Phase 2)
-        ↑
-DemoMarketDataProvider   ← generates/serves simulated prices, seeded from stocks table
-        ↑ (future)
-RealNEPSEMarketDataProvider   ← not implemented; slots in without changing callers
+```text
+app/
+├── api/
+│   ├── auth.py       # register, login, refresh, logout acknowledgement, profile
+│   ├── admin.py      # admin-only user status controls
+│   ├── market.py     # five demo quotes and generated candles
+│   ├── trading.py    # market orders, portfolio and transaction history
+│   └── deps.py       # current-user/admin dependencies and rate limiter
+├── models/           # SQLAlchemy entities
+├── schemas/          # Pydantic request and response types
+├── repositories/     # user lookup/create
+├── services/
+│   ├── auth_service.py
+│   ├── audit_service.py
+│   └── trading_service.py
+├── config.py
+├── database.py
+└── utils/
+    ├── security.py
+    └── errors.py
 ```
 
-The rest of the app (stock routes, order execution, charts) depends only
-on the `MarketDataProvider` interface, never on the demo implementation
-directly, so swapping in a real feed later is a config change
-(`MARKET_MODE=real`), not a rewrite.
+## Request and trade flow
 
-## 6. Trading engine (Phase 2/3)
+1. Registration validates input, hashes the password with Argon2, creates the user, initial virtual portfolio and default watchlist in one transaction.
+2. Login issues an access JWT and refresh JWT.
+3. Protected routes decode the access token, load the user from the database and reject missing, invalid or suspended accounts.
+4. A market-order request is validated by Pydantic and the configured IP rate limiter.
+5. `TradingService` locks the user's portfolio row, resolves a symbol from the demo quote fixture, checks cash or available shares, applies illustrative fees, updates the position and cash balance, then records the order, trade, transaction and audit event in one database transaction.
+6. Portfolio and transaction endpoints read persisted database state.
 
-`OrderExecutionService` is the single place that: validates an order,
-checks market status via `MarketSessionService`, checks cash/position,
-calculates fees via `TradingFeeService`, executes the trade, updates
-`Position`/`Portfolio.cash_balance`, writes a `Transaction`, writes an
-`AuditLog` entry, and creates a `Notification` — all inside one DB
-transaction (see `docs/trading-engine.md`, added when that phase lands).
+## Financial accounting
 
-## 7. Error handling contract
+- Money uses Python `Decimal` and database `NUMERIC(18,4)`.
+- Buy-side fees are included in the weighted-average position cost basis.
+- Sell-side fees are deducted from sale proceeds before realized P&L is calculated.
+- A sell cannot exceed the user's available position.
+- A buy cannot exceed available virtual cash including fees.
 
-Every error response has the shape:
+The fee schedule is illustrative and must not be described as the official NEPSE/broker/SEBON fee schedule.
 
-```json
-{ "success": false, "error": { "code": "INSUFFICIENT_FUNDS", "message": "..." } }
-```
+## Security and operational boundaries
 
-Raise an `APIError` subclass (see `app/utils/errors.py`) from a service;
-the global exception handler in `main.py` converts it to the right HTTP
-status. Unhandled exceptions are logged server-side and returned to the
-client as a generic `INTERNAL_ERROR` — stack traces never leave the server.
+- User identity comes from the validated bearer token, never a user ID supplied by the client.
+- Passwords are Argon2 hashes; tokens are signed JWTs.
+- Admin routes require the ADMIN role server-side.
+- Login, registration and order endpoints have IP-based rate limits.
+- Production requires long random secrets and PostgreSQL.
+- `/health` is a liveness endpoint; `/ready` checks database connectivity and returns HTTP 503 when the database is unavailable.
+- Frontend tokens are stored in localStorage. Logout clears them client-side, but server-side token revocation/rotation is not implemented.
 
-## 8. Deployment shape (Phase 15 will detail this fully)
+## Explicitly deferred
 
-- Frontend → static build → Vercel/Netlify
-- Backend → containerized ASGI app → Render/Railway/Fly.io
-- Database → managed Postgres
-- All three are decoupled by config (`CORS_ORIGINS`, `DATABASE_URL`,
-  `VITE_API_BASE_URL`) — nothing provider-specific is hardcoded.
+Live market data, the full NEPSE symbol universe, official index values, limit/stop orders, exchange-session enforcement, holiday calendars, user watchlist CRUD, price alerts, notification delivery, password recovery, email verification, MFA, refresh-token revocation, portfolio snapshots/charts, and complete operational monitoring are not implemented. Do not configure `MARKET_MODE=real`; settings validation rejects it until a provider integration exists.

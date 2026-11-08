@@ -25,18 +25,25 @@ def normalize_database_url(url: str) -> str:
 database_url = normalize_database_url(settings.DATABASE_URL)
 is_sqlite = database_url.startswith("sqlite")
 
-engine = create_engine(
-    database_url,
-    pool_pre_ping=True,
+engine_options = {
+    "pool_pre_ping": True,
+    "future": True,
+}
+if is_sqlite:
+    # SQLite's in-memory dialect uses SingletonThreadPool, which does not
+    # accept QueuePool sizing options.
+    engine_options["connect_args"] = {"check_same_thread": False}
+else:
     # Keep the connection footprint small for Neon Free and Render Free.
     # Neon suspends idle compute; pre-ping/recycle discard stale connections.
-    pool_size=2,
-    max_overflow=1,
-    pool_timeout=20,
-    pool_recycle=300,
-    connect_args={"check_same_thread": False} if is_sqlite else {},
-    future=True,
-)
+    engine_options.update(
+        pool_size=2,
+        max_overflow=1,
+        pool_timeout=20,
+        pool_recycle=300,
+    )
+
+engine = create_engine(database_url, **engine_options)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, future=True)
 

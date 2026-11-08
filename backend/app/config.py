@@ -86,6 +86,8 @@ class Settings(BaseSettings):
                 raise ValueError("JWT_SECRET must be at least 32 characters in production")
         if self.MARKET_MODE.lower() != "demo":
             raise ValueError("Only MARKET_MODE=demo is supported until a licensed market-data provider is integrated")
+        if self.JWT_ALGORITHM != "HS256":
+            raise ValueError("Only HS256 JWT signing is supported")
         return self
 
 

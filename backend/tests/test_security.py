@@ -48,4 +48,17 @@ def test_production_requires_long_random_secrets():
             SECRET_KEY="too-short",
             JWT_SECRET="also-too-short",
             MARKET_MODE="demo",
+            DATABASE_URL="postgresql://user:password@localhost/testdb",
+        )
+
+
+def test_production_rejects_ephemeral_sqlite_database():
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            ENV="production",
+            SECRET_KEY="s" * 40,
+            JWT_SECRET="j" * 40,
+            DATABASE_URL="sqlite:///temporary.db",
+            MARKET_MODE="demo",
         )

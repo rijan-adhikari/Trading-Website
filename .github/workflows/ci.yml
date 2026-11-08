@@ -58,7 +58,6 @@ jobs:
           PYTHONPATH: .
           ENV: production
           DATABASE_URL: postgresql://paper_trader:test-password@localhost:5432/paper_trader_test
-          SECRET_KEY: 12345678901234567890123456789012
           JWT_SECRET: 01234567890123456789012345678901
           MARKET_MODE: demo
         run: alembic upgrade head

@@ -10,7 +10,8 @@ NEPSE Paper Trader is an educational paper-trading MVP. The current market sourc
 - **FastAPI backend**: JSON API, request validation, authentication dependencies, rate limiting and error envelope.
 - **SQLAlchemy 2 + Alembic**: relational persistence and schema migrations.
 - **PostgreSQL**: required for production. SQLite is allowed only for local development.
-- **Render**: API web service, static frontend and managed PostgreSQL, defined in `render.yaml`.
+- **Render Free**: API web service and static frontend. The API can sleep after inactivity.
+- **Neon Free**: external PostgreSQL database. Its compute can suspend while idle; the API uses a small SQLAlchemy pool and Neon pooled connection URL.
 
 ## Backend structure
 
@@ -64,6 +65,7 @@ The fee schedule is illustrative and must not be described as the official NEPSE
 - Production requires long random secrets and PostgreSQL.
 - `/health` is a liveness endpoint; `/ready` checks database connectivity and returns HTTP 503 when the database is unavailable.
 - Frontend tokens are stored in localStorage. Logout clears them client-side, but server-side token revocation/rotation is not implemented.
+- The database engine uses a small connection pool (2 connections plus 1 overflow) and pre-ping/recycle settings to reduce stale connections with an idle-suspending Neon database.
 
 ## Explicitly deferred
 

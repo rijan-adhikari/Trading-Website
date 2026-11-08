@@ -60,3 +60,8 @@ def test_production_rejects_ephemeral_sqlite_database():
             DATABASE_URL="sqlite:///temporary.db",
             MARKET_MODE="demo",
         )
+
+
+def test_unsupported_jwt_algorithm_is_rejected():
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, JWT_ALGORITHM="none")

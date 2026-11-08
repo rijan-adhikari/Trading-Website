@@ -73,10 +73,6 @@ app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 app.include_router(market.router, prefix=settings.API_V1_PREFIX)
 app.include_router(trading.router, prefix=settings.API_V1_PREFIX)
-# Further routers (stocks, market, orders, portfolio, transactions,
-# watchlists, notifications, admin) are added in later build phases —
-# each is wired in here the same way, e.g.:
-# app.include_router(stocks.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/health", tags=["system"])

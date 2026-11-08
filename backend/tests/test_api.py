@@ -100,6 +100,21 @@ def test_registered_user_can_buy_and_sell_virtual_shares(client):
     assert Decimal(sell_row["realized_pl"]) == Decimal(sell_row["net_amount"]) - abs(Decimal(buy_row["net_amount"]))
 
 
+def test_refresh_token_issues_a_working_access_token(client):
+    response = client.post(
+        "/api/v1/auth/register",
+        json={"name": "Refresh Trader", "username": "refresh_trader", "email": "refresh@example.com", "password": "PaperTrade123!"},
+    )
+    assert response.status_code == 201, response.text
+    refresh_token = response.json()["data"]["refresh_token"]
+
+    refreshed = client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
+    assert refreshed.status_code == 200, refreshed.text
+    access_token = refreshed.json()["data"]["access_token"]
+    me = client.get("/api/v1/auth/me", headers={"Authorization": "Bearer " + access_token})
+    assert me.status_code == 200, me.text
+    assert me.json()["data"]["username"] == "refresh_trader"
+
 def test_order_endpoint_requires_authentication(client):
     response = client.post(
         "/api/v1/orders",

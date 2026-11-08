@@ -10,22 +10,26 @@ from typing import Any, Literal
 from uuid import UUID
 
 import jwt
-from passlib.context import CryptContext
+from argon2 import PasswordHasher
+from argon2.exceptions import VerificationError
 
 from app.config import get_settings
 
 settings = get_settings()
 
-# Argon2 is the OWASP-recommended default for new applications.
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+# Argon2id is the password-hashing algorithm for this application.
+password_hasher = PasswordHasher()
 
 
 def hash_password(plain_password: str) -> str:
-    return pwd_context.hash(plain_password)
+    return password_hasher.hash(plain_password)
 
 
 def verify_password(plain_password: str, password_hash: str) -> bool:
-    return pwd_context.verify(plain_password, password_hash)
+    try:
+        return password_hasher.verify(password_hash, plain_password)
+    except VerificationError:
+        return False
 
 
 def _create_token(subject: str, expires_delta: timedelta, token_type: Literal["access", "refresh"]) -> str:

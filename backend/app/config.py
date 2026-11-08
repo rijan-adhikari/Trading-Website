@@ -3,7 +3,7 @@ Central application configuration.
 
 Every value that could plausibly need to change between environments
 (dev / staging / production) or that a future engineer might otherwise
-hardcode lives here, sourced from environment variables / .env.
+hardcode lives here, sourced from environment variables / .env files.
 
 Nothing in the rest of the codebase should read os.environ directly —
 always go through `get_settings()`.
@@ -16,10 +16,15 @@ from typing import List
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=Path(__file__).resolve().parents[2] / ".env",
+        # Neon CLI writes to .env.local when no .env exists. Load both so
+        # the local FastAPI app sees the same DATABASE_URL the CLI pulled.
+        # Values in .env.local take precedence over .env.
+        env_file=(PROJECT_ROOT / ".env", PROJECT_ROOT / ".env.local"),
         extra="ignore",
     )
 

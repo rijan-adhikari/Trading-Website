@@ -1,11 +1,13 @@
 from decimal import Decimal
 
 import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.api.deps import get_client_ip
 from app.database import Base, get_db
 from app.main import app
 
@@ -104,3 +106,19 @@ def test_order_endpoint_requires_authentication(client):
         json={"symbol": "NABIL", "side": "BUY", "quantity": 1, "order_type": "MARKET"},
     )
     assert response.status_code == 401
+
+
+def test_client_ip_does_not_trust_unverified_forwarded_header():
+    request = Request({
+        "type": "http",
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "http",
+        "path": "/",
+        "raw_path": b"/",
+        "query_string": b"",
+        "headers": [(b"x-forwarded-for", b"198.51.100.77")],
+        "client": ("203.0.113.12", 12345),
+        "server": ("testserver", 80),
+    })
+    assert get_client_ip(request) == "203.0.113.12"

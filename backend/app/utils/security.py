@@ -1,7 +1,7 @@
 """
 Password hashing (Argon2) and JWT access/refresh token helpers.
 
-Nothing outside this module should call passlib or PyJWT directly — route
+Nothing outside this module should call Argon2 or PyJWT directly — route
 handlers depend on `hash_password`, `verify_password`, `create_access_token`,
 `create_refresh_token`, and `decode_token`.
 """

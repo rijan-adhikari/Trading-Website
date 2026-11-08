@@ -12,34 +12,19 @@ securities transactions ever occur.**
 
 ## Status
 
-This project is being built in phases. Current state:
+## Current release scope
 
-- [x] Phase 1 — Architecture, database schema, backend foundation (auth, config, error handling)
-- [x] Phase 2 — Market data abstraction + demo market engine
-- [ ] Phase 3 — Trading engine (order execution, fees)
-- [ ] Phase 4 — Portfolio calculations
-- [ ] Phase 5 — Remaining REST API (stocks, market, orders, portfolio, transactions, watchlists, notifications)
-- [ ] Phase 6 — Frontend (React + Vite + TS)
-- [ ] Phase 7 — Dashboard
-- [ ] Phase 8 — Admin panel
-- [ ] Phase 9 — Notifications & price alerts
-- [ ] Phase 10 — Testing
-- [ ] Phase 11 — Docker polish
-- [ ] Phase 12 — Full documentation
-- [ ] Phase 13 — Deployment configuration
+This repository currently contains an early paper-trading MVP: account registration/login, JWT access and refresh tokens, a five-symbol simulated market feed, generated demo candles, market orders, a persisted portfolio/positions ledger, transaction history, and a basic admin account-status screen. It is not a complete NEPSE market terminal. Watchlists, price alerts, notifications, live exchange data, limit-order execution, token revocation, and comprehensive integration tests are not implemented.
 
 See `docs/architecture.md` and `docs/database.md` for design details.
 
-The current market API serves clearly labeled simulated OHLCV candles for
-paper-trading development. A real NEPSE data provider must be configured
-separately after verifying its API terms and redistribution rights; the app
-does not scrape or redistribute third-party chart data by default.
+The current market API serves five hardcoded sample quotes and generated OHLCV candles. These are simulated development data, not live NEPSE prices. A licensed market-data provider integration is not implemented; this release must not be presented as a live market feed.
 
 ## Tech stack
 
 - **Backend**: Python 3.12, FastAPI, SQLAlchemy 2.0, Alembic, PostgreSQL 16
 - **Auth**: JWT (access + refresh), Argon2 password hashing
-- **Frontend** (Phase 6): React + Vite + TypeScript, Recharts
+- **Frontend**: React + Vite (JavaScript)
 - **Containers**: Docker + docker-compose
 
 ## Project structure
@@ -110,16 +95,7 @@ GET /api/v1/market/stocks/{symbol}/prices
 
 Both return simulated data until a licensed provider is configured.
 
-**Before the first run**, generate the initial migration (only needs to
-be done once, after which it's committed to the repo):
-
-```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-# with DATABASE_URL pointed at a running Postgres (e.g. via `docker compose up postgres -d`):
-alembic revision --autogenerate -m "initial schema"
-```
+The initial Alembic migration is already committed. For a new PostgreSQL database, run `alembic upgrade head`; do not generate a replacement initial migration.
 
 ### Option C — Manual PostgreSQL
 
@@ -155,7 +131,7 @@ cd backend
 pytest
 ```
 
-(Test suite is built out in Phase 10.)
+The test suite currently covers core security helpers. CI also builds the frontend. Add integration tests against a disposable PostgreSQL database before treating this MVP as production-grade.
 
 ## API overview so far
 

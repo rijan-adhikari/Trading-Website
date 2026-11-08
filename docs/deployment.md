@@ -12,7 +12,7 @@ This repository includes a Render Blueprint at the repository root. It defines o
 6. Confirm the API's `/ready` endpoint returns HTTP 200 and the static site can reach the API.
 7. If the generated frontend hostname changes, update the API's `CORS_ORIGINS` environment variable to the exact HTTPS origin and redeploy the API.
 
-The Blueprint pins the API runtime to Python 3.12.16, matching CI, and generates `SECRET_KEY` and `JWT_SECRET` values. Do not replace them with the example development values. The backend rejects short production secrets and refuses to start in production with SQLite.
+The Blueprint pins the API runtime to Python 3.12.16, matching CI, and generates a `JWT_SECRET` value. Do not replace them with the example development values. The backend rejects short production secrets and refuses to start in production with SQLite.
 
 ## Important hosting limitation
 

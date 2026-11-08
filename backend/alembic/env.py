@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app import models  # noqa: E402  (populates Base.metadata)
 from app.config import get_settings  # noqa: E402
-from app.database import Base  # noqa: E402
+from app.database import Base, normalize_database_url  # noqa: E402
 
 config = context.config
 
@@ -20,7 +20,7 @@ if config.config_file_name is not None:
 
 # Always source the DB URL from app settings/.env — never keep a second
 # copy of it hardcoded in alembic.ini.
-config.set_main_option("sqlalchemy.url", get_settings().DATABASE_URL)
+config.set_main_option("sqlalchemy.url", normalize_database_url(get_settings().DATABASE_URL).replace("%", "%%"))
 
 target_metadata = Base.metadata
 

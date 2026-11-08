@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Activity, ArrowUpRight, Bell, Check, ChevronDown, CircleHelp, Eye, LogIn, LogOut, Menu, Search, Settings2, SlidersHorizontal, Sparkles, UserPlus, Wallet, X } from 'lucide-react'
+import { Activity, ArrowUpRight, Check, ChevronDown, CircleHelp, LogIn, Menu, Search, Settings2, SlidersHorizontal, Sparkles, UserPlus, Wallet, X } from 'lucide-react'
 import './styles.css'
 
 function SkylineChart({ candles = [] }) {

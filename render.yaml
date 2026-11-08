@@ -19,6 +19,8 @@ services:
           property: connectionString
       - key: ENV
         value: production
+      - key: PYTHON_VERSION
+        value: 3.12.16
       - key: CORS_ORIGINS
         value: https://nepse-paper-trader-web.onrender.com
       - key: SECRET_KEY

@@ -26,6 +26,43 @@ jobs:
           PYTHONPATH: backend
         run: pytest -q backend/tests
 
+
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: paper_trader_test
+          POSTGRES_USER: paper_trader
+          POSTGRES_PASSWORD: test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U paper_trader -d paper_trader_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Apply Alembic migrations to PostgreSQL
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          ENV: production
+          DATABASE_URL: postgresql://paper_trader:test-password@localhost:5432/paper_trader_test
+          SECRET_KEY: 12345678901234567890123456789012
+          JWT_SECRET: 01234567890123456789012345678901
+          MARKET_MODE: demo
+        run: alembic upgrade head
+
   frontend:
     runs-on: ubuntu-latest
     steps:

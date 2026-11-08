@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 from uuid import UUID
 
-from jose import JWTError, jwt
+import jwt
 from passlib.context import CryptContext
 
 from app.config import get_settings
@@ -55,7 +55,7 @@ def decode_token(token: str, expected_type: Literal["access", "refresh"] = "acce
     """Returns the user_id encoded in the token, or raises InvalidTokenError."""
     try:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
-    except JWTError as exc:
+    except jwt.PyJWTError as exc:
         raise InvalidTokenError("Token is invalid or expired") from exc
 
     if payload.get("type") != expected_type:

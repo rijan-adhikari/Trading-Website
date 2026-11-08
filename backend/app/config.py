@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     MARKET_TIMEZONE: str = "Asia/Kathmandu"
     MARKET_OPEN: str = "11:00"
     MARKET_CLOSE: str = "15:00"
-    TRADING_DAYS: str = "SUN,MON,TUE,WED,THU"
+    TRADING_DAYS: str = "MON,TUE,WED,THU,FRI"
 
     @property
     def trading_days_list(self) -> List[str]:

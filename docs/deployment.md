@@ -1,39 +1,61 @@
-# Render deployment
+# Free deployment: Render + Neon
 
-This repository includes a Render Blueprint at the repository root. It defines one FastAPI web service, one static Vite frontend, and one managed PostgreSQL database.
+This repository uses Render for the FastAPI API and static React frontend, with Neon Free for persistent PostgreSQL. The Blueprint intentionally does **not** create a Render database, paid service, custom domain, or other billable resource.
 
-## Deploy
+## Free-tier architecture
+
+- **Render Free Web Service:** FastAPI backend. It sleeps after 15 minutes without inbound traffic and can take about a minute to wake.
+- **Render Static Site:** React/Vite frontend. Static sites do not use a paid compute instance.
+- **Neon Free:** PostgreSQL database. Free compute suspends after inactivity and wakes when a connection arrives. The free plan has a limited storage and compute allowance; check the current Neon plan page before relying on its quotas.
+- **TLS:** Render-managed HTTPS for the frontend and API.
+- **Domain:** Use the supplied `.onrender.com` hostname. A custom domain is optional and may cost money.
+
+The free tiers have limitations. This setup is for a low-traffic educational paper-trading demo, not a production financial service or a guarantee of uninterrupted availability.
+
+## 1. Create the Neon database
+
+1. Create a free account at [Neon](https://neon.tech/).
+2. Create a project, for example `nepse-paper-trader`.
+3. Select a region geographically close to the expected users, if available.
+4. Open the project's **Connect** dialog.
+5. Select the database, role, and **Pooled connection** option.
+6. Copy the PostgreSQL connection string. It should use the pooled hostname (usually includes `-pooler`) and require TLS, for example `postgresql://...@...-pooler.../neondb?sslmode=require`.
+7. Treat this URL as a password: do not commit it, paste it into an issue, or share it publicly.
+
+Use Neon's pooled connection string for the Render API. The application uses a small SQLAlchemy pool (2 persistent connections, 1 overflow) to limit connection usage and recycle stale connections after Neon suspends idle compute.
+
+## 2. Deploy the Render Blueprint
 
 1. Push or merge the intended release branch into the GitHub branch you want Render to deploy.
 2. In Render, choose **New → Blueprint** and connect this repository.
-3. Review the three resources before applying the Blueprint.
-4. Allow the API build to install `backend/requirements.txt`. Its start command runs `alembic upgrade head` before starting Uvicorn.
-5. Allow the static site to run `npm ci && npm run build`. The `VITE_API_URL` value is embedded into the frontend at build time.
-6. Confirm the API's `/ready` endpoint returns HTTP 200 and the static site can reach the API.
-7. If the generated frontend hostname changes, update the API's `CORS_ORIGINS` environment variable to the exact HTTPS origin and redeploy the API.
+3. Review the Blueprint resources: it should create only the free API web service and static frontend. It must not show a Render database or paid plan.
+4. Apply the Blueprint.
+5. Open the API service's **Environment** settings and set `DATABASE_URL` to the pooled Neon connection string copied above. Do not add quotation marks around it.
+6. Save the variable and let Render redeploy the API.
+7. Confirm the API's `/ready` endpoint returns HTTP 200 and reports `"database": true`.
+8. Open the static frontend and test registration, login, paper orders, portfolio, and transaction history.
 
-The Blueprint pins the API runtime to Python 3.12.16, matching CI, and generates a `JWT_SECRET` value. Do not replace them with the example development values. The backend rejects short production secrets and refuses to start in production with SQLite.
+The Blueprint sets `DATABASE_URL` as `sync: false`, so Render asks you to provide the secret rather than storing it in Git. It generates a separate strong `JWT_SECRET`. The backend refuses to start in production with SQLite or a short/default JWT secret.
 
-## Important hosting limitation
+If the generated frontend hostname differs from `https://nepse-paper-trader-web.onrender.com`, update the API's `CORS_ORIGINS` environment variable to the exact frontend origin and redeploy.
 
-The Blueprint intentionally uses Render's Free PostgreSQL plan to avoid silently creating a paid resource. This is suitable for a temporary demo, **not a durable production launch**:
+## 3. Database migrations
 
-- Free Render Postgres databases expire 30 days after creation. After expiry, there is a 14-day upgrade grace period before deletion.
-- Free Postgres has no backups or managed connection pooling; Render can perform maintenance or restart it.
-- Free web services spin down after 15 minutes without inbound traffic and can take about a minute to wake.
-- Free web services have ephemeral local filesystems; the application database must remain in PostgreSQL.
+The API start command runs `alembic upgrade head` before Uvicorn. On first deployment, this creates the application tables in the empty Neon database. Subsequent restarts apply only unapplied migrations.
 
-Before accepting real users or relying on saved accounts, upgrade the database to a paid PostgreSQL plan, verify backups/restore procedures, and choose an appropriate paid API service plan. Do not rely on the Free database for user records or trading history.
+Do not run migrations against an existing database until you have checked its contents and taken an export. If migrating existing user data from another database, export it first and import it into Neon; deploying the schema alone does not copy existing accounts or trades.
 
-## Functional scope and data integrity
+## 4. Free-tier limitations and data safety
 
-This release is a paper-trading MVP. It uses five hardcoded sample quotes and generated OHLCV candles. It does **not** connect to NEPSE or a licensed market-data provider. All quotes and orders are simulated. Do not advertise the current feed as live NEPSE data.
+- Render Free web services spin down after 15 minutes without inbound traffic. A first request after idle may be slow.
+- Neon Free compute can suspend when idle and may take a moment to wake. Its storage, compute-hours, branches and other quotas are limited by the current free plan.
+- Render's local filesystem is ephemeral. The app must store persistent records only in Neon, not local files.
+- Free tiers can change, impose quotas, or suspend resources. Monitor both provider dashboards.
+- This configuration does not create paid Render resources. Do not upgrade a plan or add a paid database.
+- A free database is not a backup strategy. Periodically export the Neon database and keep a copy on your own computer. Test restoring an export before trusting it.
+- Do not store real money, broker credentials, or sensitive financial data in this educational simulator.
 
-Market orders execute immediately against the configured demo quote, even outside NEPSE's trading session. Limit/stop orders, real-time market-session enforcement, user watchlists, price alerts, notification delivery, refresh-token revocation, and full operational monitoring are not implemented.
-
-The simulated fee schedule is configurable and is not represented as the official current broker/SEBON fee schedule. Buy-side fees are included in the position cost basis and sell-side fees are deducted from realized proceeds.
-
-## Local verification
+## 5. Local verification
 
 From the repository root:
 
@@ -53,4 +75,12 @@ npm ci
 npm run build
 ```
 
-The GitHub Actions workflow runs these checks on pushes to `main` and `production-hardening`, and on pull requests targeting `main`.
+The GitHub Actions workflow runs backend tests, PostgreSQL migrations, dependency audits, and the frontend production build on pushes to `main` and `production-hardening`, and on pull requests targeting `main`.
+
+## Functional scope and data integrity
+
+This release is a paper-trading MVP. It uses five hardcoded sample quotes and generated OHLCV candles. It does **not** connect to NEPSE or a licensed market-data provider. All quotes and orders are simulated. Do not advertise the current feed as live NEPSE data.
+
+Market orders execute immediately against the configured demo quote, even outside NEPSE's trading session. Limit/stop orders, real-time market-session enforcement, user watchlists, price alerts, notification delivery, refresh-token revocation, and full operational monitoring are not implemented.
+
+The simulated fee schedule is configurable and is not represented as the official current broker/SEBON fee schedule. Buy-side fees are included in the position cost basis and sell-side fees are deducted from realized proceeds.

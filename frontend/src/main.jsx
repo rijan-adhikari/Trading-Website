@@ -67,19 +67,26 @@ async function apiRequest(path, options = {}) {
   try { response = await send(token) }
   catch { throw new Error('Cannot reach the API at ' + API_BASE + '. Check the API service and VITE_API_URL.') }
   if (response.status === 401 && path !== '/auth/refresh' && localStorage.getItem('nepse_refresh_token')) {
+    let refreshResponse
     try {
-      const refreshResponse = await fetch(API_BASE + '/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: localStorage.getItem('nepse_refresh_token') }) })
-      const refreshed = await refreshResponse.json().catch(() => ({}))
-      if (!refreshResponse.ok || !refreshed.data?.access_token) throw new Error('Session expired')
-      localStorage.setItem('nepse_access_token', refreshed.data.access_token)
-      response = await send(refreshed.data.access_token)
+      refreshResponse = await fetch(API_BASE + '/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: localStorage.getItem('nepse_refresh_token') }) })
     } catch {
+      throw new Error('The API is temporarily unreachable. Your session has been kept; please retry.')
+    }
+    const refreshed = await refreshResponse.json().catch(() => ({}))
+    if (!refreshResponse.ok || !refreshed.data?.access_token) {
       localStorage.removeItem('nepse_access_token'); localStorage.removeItem('nepse_refresh_token'); localStorage.removeItem('nepse_user')
       throw new Error('Your session has expired. Please sign in again.')
     }
+    localStorage.setItem('nepse_access_token', refreshed.data.access_token)
+    try { response = await send(refreshed.data.access_token) }
+    catch { throw new Error('The API is temporarily unreachable. Your session has been kept; please retry.') }
   }
   const result = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(result.error?.message || result.detail || 'Request failed.')
+  if (!response.ok) {
+    const detail = Array.isArray(result.detail) ? result.detail.map(item => item.msg || 'Invalid input').join('; ') : result.detail
+    throw new Error(result.error?.message || detail || 'Request failed.')
+  }
   return result.data
 }
 

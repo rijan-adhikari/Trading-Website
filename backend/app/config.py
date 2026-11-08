@@ -81,11 +81,6 @@ class Settings(BaseSettings):
     RATE_LIMIT_REGISTER: str = "3/minute"
     RATE_LIMIT_ORDERS: str = "20/minute"
 
-    # --- Demo account ---
-    CREATE_DEMO_ACCOUNT: bool = True
-    DEMO_ACCOUNT_EMAIL: str = "demo@example.com"
-    DEMO_ACCOUNT_PASSWORD: str = "DemoPassword123!"
-
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
         if self.ENV.lower() == "production":

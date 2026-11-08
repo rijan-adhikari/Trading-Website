@@ -12,25 +12,40 @@ This repository uses Render for the FastAPI API and static React frontend, with 
 
 The free tiers have limitations. This setup is for a low-traffic educational paper-trading demo, not a production financial service or a guarantee of uninterrupted availability.
 
-## 1. Create the Neon database
+## 1. Link this repository to the existing Neon project
 
-1. Create a free account at [Neon](https://neon.tech/).
-2. Create a project, for example `nepse-paper-trader`.
-3. Select a region geographically close to the expected users, if available.
-4. Open the project's **Connect** dialog.
-5. Select the database, role, and **Pooled connection** option.
-6. Copy the PostgreSQL connection string. It should use the pooled hostname (usually includes `-pooler`) and require TLS, for example `postgresql://...@...-pooler.../neondb?sslmode=require`.
-7. Treat this URL as a password: do not commit it, paste it into an issue, or share it publicly.
+Run these commands from the **repository root** on a machine with Node.js 20.19.2 or newer:
+
+```bash
+npm i -g neon@latest
+neon init -y --org-id org-wispy-cake-97010474 --project-id holy-recipe-29270130 --branch production --services postgres
+neon deploy
+```
+
+If the global install fails, use `npx neon@latest` in place of `neon` for the CLI commands. Complete any browser sign-in prompt. If authentication times out or fails, run `neon login` and retry the failed command. The current Neon CLI documentation also lists `neon auth` as its authentication command.
+
+The CLI links the local repository to the specified organization, project and branch; writes the Neon config-as-code file `neon.ts`; installs the required Neon config package and available agent tooling; and pulls Neon-managed environment variables into `.env.local` (or `.env` if that file already exists). `neon deploy` applies the declared Neon configuration and refreshes the local environment values. This app only needs Neon Postgres; do not add Auth, Data API, Object Storage, Functions or AI Gateway for this integration.
+
+The FastAPI backend uses SQLAlchemy with the PostgreSQL `psycopg2` driver already pinned in `backend/requirements.txt`. It reads `DATABASE_URL` from the process environment or the repository-root `.env` / `.env.local`. Use Neon's pooled connection URL for the Render API. The frontend must never receive the database URL.
+
+Treat both `.env` and `.env.local` as secrets. They are git-ignored. Never commit them or paste their contents into GitHub issues or chat.
+
+## 2. Create or confirm the Neon database
+
+1. Open the project's Neon Console and confirm the `production` branch exists.
+2. Confirm the project is on the Free plan and that only PostgreSQL is enabled for this app.
+3. Use the pooled connection string for the application. It should use the pooled hostname (usually includes `-pooler`) and require TLS, for example `postgresql://...@...-pooler.../neondb?sslmode=require`.
+4. Do not share the connection string. It contains the database password.
 
 Use Neon's pooled connection string for the Render API. The application uses a small SQLAlchemy pool (2 persistent connections, 1 overflow) to limit connection usage and recycle stale connections after Neon suspends idle compute.
 
-## 2. Deploy the Render Blueprint
+## 3. Deploy the Render Blueprint
 
 1. Push or merge the intended release branch into the GitHub branch you want Render to deploy.
 2. In Render, choose **New → Blueprint** and connect this repository.
 3. Review the Blueprint resources: it should create only the free API web service and static frontend. It must not show a Render database or paid plan.
 4. Apply the Blueprint.
-5. Open the API service's **Environment** settings and set `DATABASE_URL` to the pooled Neon connection string copied above. Do not add quotation marks around it.
+5. Open the API service's **Environment** settings and set `DATABASE_URL` to the pooled Neon PostgreSQL connection string. Do not add quotation marks around it.
 6. Save the variable and let Render redeploy the API.
 7. Confirm the API's `/ready` endpoint returns HTTP 200 and reports `"database": true`.
 8. Open the static frontend and test registration, login, paper orders, portfolio, and transaction history.
@@ -39,13 +54,13 @@ The Blueprint sets `DATABASE_URL` as `sync: false`, so Render asks you to provid
 
 If the generated frontend hostname differs from `https://nepse-paper-trader-web.onrender.com`, update the API's `CORS_ORIGINS` environment variable to the exact frontend origin and redeploy.
 
-## 3. Database migrations
+## 4. Database migrations
 
 The API start command runs `alembic upgrade head` before Uvicorn. On first deployment, this creates the application tables in the empty Neon database. Subsequent restarts apply only unapplied migrations.
 
-Do not run migrations against an existing database until you have checked its contents and taken an export. If migrating existing user data from another database, export it first and import it into Neon; deploying the schema alone does not copy existing accounts or trades.
+Do not run migrations against a database containing important user data until you have checked its contents and taken an export. If migrating existing user data from another database, export it first and import it into Neon; deploying the schema alone does not copy existing accounts or trades.
 
-## 4. Free-tier limitations and data safety
+## 5. Free-tier limitations and data safety
 
 - Render Free web services spin down after 15 minutes without inbound traffic. A first request after idle may be slow.
 - Neon Free compute can suspend when idle and may take a moment to wake. Its storage, compute-hours, branches and other quotas are limited by the current free plan.
@@ -55,7 +70,7 @@ Do not run migrations against an existing database until you have checked its co
 - A free database is not a backup strategy. Periodically export the Neon database and keep a copy on your own computer. Test restoring an export before trusting it.
 - Do not store real money, broker credentials, or sensitive financial data in this educational simulator.
 
-## 5. Local verification
+## 6. Local verification
 
 From the repository root:
 

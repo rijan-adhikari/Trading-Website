@@ -1,178 +1,172 @@
 # NEPSE Paper Trader
 
-**Practice NEPSE trading with virtual money.**
+A browser-based paper-trading MVP for learning the mechanics of NEPSE share trading with virtual NPR. It does not connect to a broker, execute real securities transactions, or provide investment advice.
 
-A full-stack paper-trading simulation platform for the Nepal Stock
-Exchange. Every user starts with **NPR 1,000,000** in virtual cash and
-trades against simulated (clearly labeled) market data. **No real
-securities transactions ever occur.**
+> **Data disclaimer:** the current market feed contains five hardcoded sample quotes and generated OHLCV candles. It is simulated development data, not live NEPSE market data.
 
-> ⚠️ This is a simulation platform. It does not execute real trades, is
-> not affiliated with NEPSE, and does not provide investment advice.
+## Current release
 
-## Status
+### Implemented
+- Registration and login with Argon2 password hashing.
+- JWT access tokens and refresh endpoint; the frontend stores both tokens and refreshes an expired access token.
+- One virtual portfolio per user, initially funded with NPR 1,000,000 by default.
+- Simulated market list and generated five-minute candles for five sample symbols.
+- Immediate market BUY/SELL paper orders.
+- Weighted-average position cost basis, including simulated buy-side fees.
+- Sell-side fees deducted from realized proceeds and realized P&L.
+- Persisted orders, trades, transactions and audit log entries.
+- Basic admin user activation/suspension endpoints.
+- Docker Compose and Render Blueprint deployment definitions.
 
-## Current release scope
+### Not implemented
+- Live NEPSE market data or a licensed data-provider integration.
+- Full NEPSE symbol directory, company fundamentals, historical exchange candles or official index feed.
+- Limit, stop or stop-limit order execution.
+- Market-session/holiday enforcement; demo market orders fill immediately against the sample quote, including outside exchange hours.
+- User-managed watchlists, price alerts, notification delivery or portfolio history charts.
+- Refresh-token revocation/rotation, email verification, password reset or multi-factor authentication.
+- Complete admin role provisioning, operational monitoring or comprehensive PostgreSQL integration tests.
 
-This repository currently contains an early paper-trading MVP: account registration/login, JWT access and refresh tokens, a five-symbol simulated market feed, generated demo candles, market orders, a persisted portfolio/positions ledger, transaction history, and a basic admin account-status screen. It is not a complete NEPSE market terminal. Watchlists, price alerts, notifications, live exchange data, limit-order execution, token revocation, and comprehensive integration tests are not implemented.
+The current simulator is an MVP and must not be marketed as a live-data or production brokerage product.
 
-See `docs/architecture.md` and `docs/database.md` for design details.
+## Technology
 
-The current market API serves five hardcoded sample quotes and generated OHLCV candles. These are simulated development data, not live NEPSE prices. A licensed market-data provider integration is not implemented; this release must not be presented as a live market feed.
+- **Backend:** Python 3.12, FastAPI, SQLAlchemy 2, Alembic, PostgreSQL
+- **Authentication:** JWT, Argon2
+- **Frontend:** React + Vite
+- **Testing:** pytest, FastAPI TestClient
+- **Deployment:** Docker Compose and Render Blueprint
 
-## Tech stack
+## Repository layout
 
-- **Backend**: Python 3.12, FastAPI, SQLAlchemy 2.0, Alembic, PostgreSQL 16
-- **Auth**: JWT (access + refresh), Argon2 password hashing
-- **Frontend**: React + Vite (JavaScript)
-- **Containers**: Docker + docker-compose
-
-## Project structure
-
-```
-nepse-paper-trader/
+```text
+.
 ├── backend/
 │   ├── app/
-│   │   ├── main.py          # FastAPI app, middleware, error handlers
-│   │   ├── config.py         # All settings, sourced from env
-│   │   ├── database.py       # SQLAlchemy engine/session
-│   │   ├── api/               # Routers (auth.py so far)
-│   │   ├── models/            # SQLAlchemy ORM models (17 tables)
-│   │   ├── schemas/           # Pydantic request/response models
-│   │   ├── services/          # Business logic
-│   │   ├── repositories/      # DB access layer
-│   │   └── utils/             # security.py, errors.py
-│   ├── alembic/                # Migrations
-│   ├── tests/
+│   │   ├── api/             # auth, admin, market and trading routes
+│   │   ├── models/          # SQLAlchemy models
+│   │   ├── schemas/         # Pydantic request/response schemas
+│   │   ├── services/        # authentication, audit and trading logic
+│   │   └── utils/           # security and API errors
+│   ├── alembic/             # database migrations
+│   ├── tests/               # unit and API integration tests
 │   ├── requirements.txt
 │   └── Dockerfile
-├── frontend/                   # Scaffolded, built starting Phase 6
+├── frontend/
+│   ├── src/main.jsx
+│   ├── src/styles.css
+│   └── package-lock.json
 ├── docs/
 │   ├── architecture.md
-│   └── database.md
+│   ├── database.md
+│   └── deployment.md
+├── .github/workflows/ci.yml
 ├── docker-compose.yml
-├── .env.example
-└── .gitignore
+├── render.yaml
+└── .env.example
 ```
 
-## Getting started (local development)
+## Run locally
 
-### Prerequisites
+### Backend with SQLite (development only)
 
-- Python 3.12+
-- PostgreSQL 16 (or Docker)
-- Docker + docker-compose (recommended — simplest path)
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+PYTHONPATH=. uvicorn app.main:app --reload
+```
 
-### Option A — Docker (recommended)
+The development app creates SQLite tables on startup. SQLite is not allowed when `ENV=production`.
+
+API documentation: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+### Frontend
+
+In another terminal:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+The frontend defaults to `http://localhost:8000/api/v1`. Override it with `VITE_API_URL` if the backend runs elsewhere.
+
+### Docker Compose
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-This starts Postgres and the backend, running `alembic upgrade head`
-automatically on boot. API docs at http://localhost:8000/docs.
+This starts PostgreSQL and the API. The backend container applies the committed Alembic migration before starting.
 
-### Option B — Local API without PostgreSQL
+## API overview
 
-For frontend and auth development, the backend defaults to a local SQLite
-database when `DATABASE_URL` is not set. This mode creates its tables on
-startup and is not intended for production:
+All application routes are under `/api/v1`.
 
-```bash
-cd backend
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
+| Method | Endpoint | Purpose |
+|---|---|---|
+| POST | `/auth/register` | Register and create a funded paper portfolio |
+| POST | `/auth/login` | Authenticate and issue access/refresh tokens |
+| POST | `/auth/refresh` | Issue a new access token |
+| POST | `/auth/logout` | Client-side logout acknowledgement; tokens are not revoked server-side |
+| GET | `/auth/me` | Current user |
+| POST | `/auth/change-password` | Change password |
+| GET | `/market/stocks` | Five simulated sample quotes |
+| GET | `/market/stocks/{symbol}/prices` | Generated demo candles |
+| POST | `/orders` | Execute an immediate market paper order |
+| GET | `/orders` | Current user's orders |
+| GET | `/portfolio` | Current user's cash, holdings and P&L |
+| GET | `/transactions` | Current user's transaction ledger |
+| GET | `/admin/users` | Admin-only user directory |
+| PATCH | `/admin/users/{user_id}` | Admin-only account activation status |
 
-The API runs at http://localhost:8000. The market endpoints are:
+System endpoints: `GET /health` (liveness) and `GET /ready` (database readiness; returns 503 when the database is unavailable).
 
-```text
-GET /api/v1/market/stocks
-GET /api/v1/market/stocks/{symbol}/prices
-```
-
-Both return simulated data until a licensed provider is configured.
-
-The initial Alembic migration is already committed. For a new PostgreSQL database, run `alembic upgrade head`; do not generate a replacement initial migration.
-
-### Option C — Manual PostgreSQL
-
-```bash
-# 1. Postgres
-docker run -d --name nepse-db -p 5432:5432 \
-  -e POSTGRES_USER=nepse -e POSTGRES_PASSWORD=nepse_dev_password \
-  -e POSTGRES_DB=nepse_paper_trader postgres:16-alpine
-
-# 2. Backend
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp ../.env.example ../.env   # edit DATABASE_URL if not using the defaults above
-alembic revision --autogenerate -m "initial schema"
-alembic upgrade head
-uvicorn app.main:app --reload
-```
-
-API now running at http://localhost:8000 — interactive docs at `/docs`,
-ReDoc at `/redoc`.
-
-## Environment variables
-
-See `.env.example` for the full list (database, JWT secrets, initial
-virtual balance, fee schedule, market hours, rate limits). Never commit
-a real `.env` file.
-
-## Testing
+## Tests and build
 
 ```bash
 cd backend
-pytest
+PYTHONPATH=. pytest -q tests
+cd ../frontend
+npm ci
+npm run build
 ```
 
-The test suite currently covers core security helpers. CI also builds the frontend. Add integration tests against a disposable PostgreSQL database before treating this MVP as production-grade.
+GitHub Actions runs backend tests and the frontend production build on pushes to `main` / `production-hardening` and pull requests targeting `main`.
 
-## API overview so far
+## Deployment
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/v1/auth/register` | Create account, receive NPR 1,000,000 virtual balance |
-| POST | `/api/v1/auth/login` | Get access + refresh tokens |
-| POST | `/api/v1/auth/refresh` | Exchange refresh token for a new access token |
-| POST | `/api/v1/auth/logout` | Client-side token discard |
-| GET  | `/api/v1/auth/me` | Current user profile |
-| POST | `/api/v1/auth/change-password` | Change password |
-| GET  | `/health` | Liveness check |
-| GET  | `/ready` | Readiness check (verifies DB connectivity) |
+See [docs/deployment.md](docs/deployment.md) for the Render Blueprint setup, required environment configuration and free-tier limitations.
 
-Full API surface grows through the remaining phases — see
-`docs/architecture.md`.
+The Blueprint currently uses Free Render Postgres to avoid creating a paid resource without approval. Free Postgres expires after 30 days, so upgrade to a paid database and verify backups before storing data for real users.
+
+## Trading assumptions
+
+- Default starting capital: NPR 1,000,000 virtual cash.
+- The configured NEPSE trading week is Monday–Friday, 11:00–15:00 Nepal time. This is configuration/documentation only; the current demo execution endpoint does not enforce market sessions or holidays.
+- All fee percentages are illustrative simulator settings, not the official current broker/SEBON/DP fee schedule.
+- Buy fees are included in average cost basis; sell fees reduce net proceeds and realized P&L.
+- All money calculations use `NUMERIC(18,4)` / Python `Decimal`, not binary floating point.
 
 ## Security notes
 
-- Passwords hashed with Argon2, never stored or logged in plaintext.
-- JWT access tokens (60 min) + refresh tokens (7 days), both configurable.
-- Every sensitive action (login, failed login, password change, trades,
-  admin edits) is written to `audit_logs`.
-- All monetary values use `NUMERIC(18,4)` — never floating point.
-- Consistent `{success, error: {code, message}}` error envelope; no
-  stack traces are ever returned to the client.
+- Never commit `.env`, API keys, database URLs or production secrets.
+- Production requires long random `SECRET_KEY` and `JWT_SECRET` values and a PostgreSQL `DATABASE_URL`.
+- The frontend stores JWTs in browser localStorage. This is convenient for the MVP but increases exposure if an XSS vulnerability is introduced.
+- Logout currently removes browser tokens only; previously issued refresh tokens remain valid until expiry.
+- Admin endpoints enforce the ADMIN role server-side. Do not grant this role to untrusted users.
 
 ## Disclaimer
 
-NEPSE Paper Trader is a paper-trading simulation platform. It does not
-execute real securities transactions and does not provide investment
-advice. Market data is simulated/demo data unless a real market-data
-provider has been explicitly connected and documented as such.
-
-## License
-
-MIT (see `LICENSE`).
+NEPSE Paper Trader is an educational simulation. It is not affiliated with NEPSE or SEBON, is not a broker or investment adviser, and does not place real orders or hold real money. Simulated performance is not evidence of future investment returns.
 
 ## Author
 
-Developed by **[Rijan Adhikari](https://github.com/rijan-adhikari)**.
+Developed by [Rijan Adhikari](https://github.com/rijan-adhikari).
 
 - Portfolio: https://adhikari-rijan.onrender.com/
 - GitHub: https://github.com/rijan-adhikari

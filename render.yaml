@@ -11,7 +11,7 @@ services:
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /health
+    healthCheckPath: /ready
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -20,7 +20,7 @@ services:
       - key: ENV
         value: production
       - key: CORS_ORIGINS
-        sync: false
+        value: https://nepse-paper-trader-web.onrender.com
       - key: SECRET_KEY
         generateValue: true
       - key: JWT_SECRET
@@ -74,7 +74,7 @@ services:
     name: nepse-paper-trader-web
     runtime: static
     rootDir: frontend
-    buildCommand: npm install && npm run build
+    buildCommand: npm ci && npm run build
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL

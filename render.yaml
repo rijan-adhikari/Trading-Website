@@ -69,8 +69,6 @@ services:
         value: 3/minute
       - key: RATE_LIMIT_ORDERS
         value: 20/minute
-      - key: CREATE_DEMO_ACCOUNT
-        value: "false"
 
   - type: web
     name: nepse-paper-trader-web

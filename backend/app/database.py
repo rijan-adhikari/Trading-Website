@@ -14,8 +14,16 @@ from app.config import get_settings
 
 settings = get_settings()
 
+
+def normalize_database_url(url: str) -> str:
+    """Normalize provider URLs before passing them to SQLAlchemy 2.x."""
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql://", 1)
+    return url
+
+
 engine = create_engine(
-    settings.DATABASE_URL,
+    normalize_database_url(settings.DATABASE_URL),
     pool_pre_ping=True,
     connect_args={"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {},
     future=True,

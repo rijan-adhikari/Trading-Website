@@ -1,9 +1,3 @@
-databases:
-  - name: nepse-paper-trader-db
-    plan: free
-    databaseName: nepse_paper_trader
-    user: nepse
-
 services:
   - type: web
     name: nepse-paper-trader-api
@@ -14,10 +8,10 @@ services:
     startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
     healthCheckPath: /ready
     envVars:
+      # Create a free Neon project and paste its pooled PostgreSQL URL here
+      # in the Render Dashboard. Do not commit the secret to Git.
       - key: DATABASE_URL
-        fromDatabase:
-          name: nepse-paper-trader-db
-          property: connectionString
+        sync: false
       - key: ENV
         value: production
       - key: PYTHON_VERSION

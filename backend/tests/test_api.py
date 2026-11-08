@@ -90,7 +90,12 @@ def test_registered_user_can_buy_and_sell_virtual_shares(client):
     assert Decimal(final_portfolio["cash_balance"]) < Decimal("1000000")
     transactions = client.get("/api/v1/transactions", headers=headers)
     assert transactions.status_code == 200
-    assert len(transactions.json()["data"]) == 2
+    rows = transactions.json()["data"]
+    assert len(rows) == 2
+    buy_row = next(row for row in rows if row["side"] == "BUY")
+    sell_row = next(row for row in rows if row["side"] == "SELL")
+    # Realized P&L includes the buy fee in cost basis and deducts the sell fee.
+    assert Decimal(sell_row["realized_pl"]) == Decimal(sell_row["net_amount"]) - abs(Decimal(buy_row["net_amount"]))
 
 
 def test_order_endpoint_requires_authentication(client):

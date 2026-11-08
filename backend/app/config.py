@@ -95,8 +95,10 @@ class Settings(BaseSettings):
                 "change-this-to-a-long-random-string",
                 "change-this-to-a-different-long-random-string",
             }
-            if self.SECRET_KEY in placeholders or self.JWT_SECRET in placeholders:
-                raise ValueError("SECRET_KEY and JWT_SECRET must be real secrets in production")
+            if (self.SECRET_KEY in placeholders or self.JWT_SECRET in placeholders or len(self.SECRET_KEY) < 32 or len(self.JWT_SECRET) < 32):
+                raise ValueError("SECRET_KEY and JWT_SECRET must each be at least 32 characters in production")
+        if self.MARKET_MODE.lower() != "demo":
+            raise ValueError("Only MARKET_MODE=demo is supported until a licensed market-data provider is integrated")
         return self
 
 

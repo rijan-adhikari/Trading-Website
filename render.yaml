@@ -44,7 +44,7 @@ services:
       - key: MARKET_CLOSE
         value: "15:00"
       - key: TRADING_DAYS
-        value: SUN,MON,TUE,WED,THU
+        value: MON,TUE,WED,THU,FRI
       - key: INITIAL_VIRTUAL_BALANCE
         value: "1000000"
       - key: BASE_CURRENCY

@@ -11,7 +11,7 @@ const watchlist = [
   { symbol: 'SHIVM', name: 'Shivam Cement', price: '532.00', change: '-1.28%', direction: 'down' },
 ]
 
-const tickerItems = [...watchlist, { symbol: 'NEPSE', name: 'NEPSE Index', price: '2,118.47', change: '+0.38%', direction: 'up' }]
+const tickerItems = [...watchlist]
 
 function SkylineChart({ candles = [] }) {
   const points = candles.length ? candles.map((candle, index) => {
@@ -51,24 +51,35 @@ function SkylineChart({ candles = [] }) {
 }
 
 function Ticker() {
-  return <div className="ticker" aria-label="Live market ticker"><div className="ticker-track">{tickerItems.concat(tickerItems).map((item, index) => <span className="ticker-item" key={`${item.symbol}-${index}`}><b>{item.symbol}</b><span>{item.price}</span><em className={item.direction}>{item.change}</em></span>)}</div></div>
+  return <div className="ticker" aria-label="Simulated market ticker"><div className="ticker-track">{tickerItems.concat(tickerItems).map((item, index) => <span className="ticker-item" key={`${item.symbol}-${index}`}><b>{item.symbol}</b><span>{item.price}</span><em className={item.direction}>{item.change}</em></span>)}</div></div>
 }
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
 async function apiRequest(path, options = {}) {
+  const { token = localStorage.getItem('nepse_access_token'), body, headers = {}, ...requestOptions } = options
+  const send = (accessToken) => fetch(API_BASE + path, {
+    ...requestOptions,
+    headers: { 'Content-Type': 'application/json', ...headers, ...(accessToken ? { Authorization: 'Bearer ' + accessToken } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  })
   let response
-  try {
-    response = await fetch(`${API_BASE}${path}`, {
-      headers: { 'Content-Type': 'application/json', ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}) },
-      ...options,
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    })
-  } catch {
-    throw new Error(`Cannot reach the API at ${API_BASE}. Start the backend or set VITE_API_URL.`)
+  try { response = await send(token) }
+  catch { throw new Error('Cannot reach the API at ' + API_BASE + '. Check the API service and VITE_API_URL.') }
+  if (response.status === 401 && path !== '/auth/refresh' && localStorage.getItem('nepse_refresh_token')) {
+    try {
+      const refreshResponse = await fetch(API_BASE + '/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: localStorage.getItem('nepse_refresh_token') }) })
+      const refreshed = await refreshResponse.json().catch(() => ({}))
+      if (!refreshResponse.ok || !refreshed.data?.access_token) throw new Error('Session expired')
+      localStorage.setItem('nepse_access_token', refreshed.data.access_token)
+      response = await send(refreshed.data.access_token)
+    } catch {
+      localStorage.removeItem('nepse_access_token'); localStorage.removeItem('nepse_refresh_token'); localStorage.removeItem('nepse_user')
+      throw new Error('Your session has expired. Please sign in again.')
+    }
   }
   const result = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(result.error?.message || 'Request failed.')
+  if (!response.ok) throw new Error(result.error?.message || result.detail || 'Request failed.')
   return result.data
 }
 
@@ -82,6 +93,7 @@ function AuthModal({ mode, onClose, onAuthenticated }) {
     try {
       const data = await apiRequest(`/auth/${formMode === 'login' ? 'login' : 'register'}`, { method: 'POST', body: formMode === 'login' ? { email: form.email, password: form.password } : form })
       localStorage.setItem('nepse_access_token', data.access_token)
+      localStorage.setItem('nepse_refresh_token', data.refresh_token)
       localStorage.setItem('nepse_user', JSON.stringify(data.user))
       onAuthenticated(data.user)
     } catch (requestError) { setError(requestError.message) } finally { setBusy(false) }
@@ -103,7 +115,7 @@ function MarketsPage({ onSelect }) {
   const [query, setQuery] = useState('')
   const [onlyGainers, setOnlyGainers] = useState(false)
   const filtered = watchlist.filter(item => item.symbol.toLowerCase().includes(query.toLowerCase()) && (!onlyGainers || item.direction === 'up'))
-  return <section className="app-page"><div className="page-heading"><div><p className="eyebrow"><span className="pulse-dot" /> SIMULATED MARKET</p><h1>Find your <span>next move.</span></h1><p className="hero-copy">Explore the NEPSE universe with transparent demo prices. Select an instrument to open its chart.</p></div><span className="data-badge">DEMO DATA / LIVE UI</span></div><div className="market-tools"><label className="search-field"><Search size={16} /><input placeholder="Search symbol or company" value={query} onChange={event => setQuery(event.target.value)} /></label><button className={onlyGainers ? 'filter-button active-filter' : 'filter-button'} onClick={() => setOnlyGainers(!onlyGainers)}><SlidersHorizontal size={15} /> {onlyGainers ? 'Gainers only' : 'All stocks'}</button></div><div className="market-grid">{filtered.map(item => <button className="market-card panel" key={item.symbol} onClick={() => onSelect(item.symbol)}><div className="market-card-top"><span className="company-badge">{item.symbol[0]}</span><span className="market-change"><em className={item.direction}>{item.change}</em></span></div><p className="eyebrow">{item.symbol}</p><h2>{item.name}</h2><strong className="metric-number">NPR {item.price}</strong><div className="mini-chart"><span className={item.direction} /></div><small>View chart <ArrowUpRight size={13} /></small></button>)}</div>{filtered.length === 0 && <div className="empty-state panel"><Search size={22} /><h2>No matching stocks</h2><p>Try a symbol such as NABIL or NICA.</p></div>}</section>
+  return <section className="app-page"><div className="page-heading"><div><p className="eyebrow"><span className="pulse-dot" /> SIMULATED MARKET</p><h1>Find your <span>next move.</span></h1><p className="hero-copy">Explore a small sample of clearly labeled simulated NEPSE instruments. Select one to open its generated demo chart.</p></div><span className="data-badge">DEMO DATA / LIVE UI</span></div><div className="market-tools"><label className="search-field"><Search size={16} /><input placeholder="Search symbol or company" value={query} onChange={event => setQuery(event.target.value)} /></label><button className={onlyGainers ? 'filter-button active-filter' : 'filter-button'} onClick={() => setOnlyGainers(!onlyGainers)}><SlidersHorizontal size={15} /> {onlyGainers ? 'Gainers only' : 'All stocks'}</button></div><div className="market-grid">{filtered.map(item => <button className="market-card panel" key={item.symbol} onClick={() => onSelect(item.symbol)}><div className="market-card-top"><span className="company-badge">{item.symbol[0]}</span><span className="market-change"><em className={item.direction}>{item.change}</em></span></div><p className="eyebrow">{item.symbol}</p><h2>{item.name}</h2><strong className="metric-number">NPR {item.price}</strong><div className="mini-chart"><span className={item.direction} /></div><small>View chart <ArrowUpRight size={13} /></small></button>)}</div>{filtered.length === 0 && <div className="empty-state panel"><Search size={22} /><h2>No matching stocks</h2><p>Try a symbol such as NABIL or NICA.</p></div>}</section>
 }
 
 function PortfolioPage({ user }) {
@@ -111,10 +123,10 @@ function PortfolioPage({ user }) {
   const [error, setError] = useState('')
   useEffect(() => { if (user) apiRequest('/portfolio', { token: localStorage.getItem('nepse_access_token') }).then(setPortfolio).catch(requestError => setError(requestError.message)) }, [user])
   if (!user) return <section className="app-page"><div className="empty-state panel"><Wallet size={22} /><h2>Sign in to view your portfolio</h2><p>Your virtual balance and positions are private to your account.</p></div></section>
-  const cash = portfolio?.cash_balance ?? '1000000.00'
-  const total = portfolio?.total_value ?? cash
+  const cash = portfolio?.cash_balance ?? 0
+  const total = portfolio?.total_value ?? 0
   const positions = portfolio?.positions || []
-  const allocation = [{ label: 'NABIL', value: 31, color: '#6C5CE7' }, { label: 'NICA', value: 24, color: '#3DD68C' }, { label: 'SCB', value: 18, color: '#E8B44D' }, { label: 'Cash', value: 27, color: '#394254' }]
+  
   return <section className="app-page"><div className="page-heading"><div><p className="eyebrow">CAPITAL / OVERVIEW</p><h1>Your practice <span>portfolio.</span></h1><p className="hero-copy">A clear view of virtual capital, allocation, and performance. Nothing here touches real securities.</p></div><span className="data-badge">DATABASE PORTFOLIO</span></div>{error && <p className="form-error">{error}</p>}<div className="portfolio-summary"><div className="panel balance-card"><span>Net portfolio value</span><strong className="metric-number">NPR {Number(total).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong><em className="positive">Persisted account value</em></div><div className="panel balance-card"><span>Unrealized P&amp;L</span><strong className="metric-number positive">+NPR {Number(portfolio?.unrealized_pl || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong><small>{positions.length} open positions</small></div><div className="panel balance-card"><span>Cash available</span><strong className="metric-number">NPR {Number(cash).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong><small>Available buying power</small></div></div><div className="portfolio-layout"><div className="panel allocation-panel"><div className="panel-heading compact"><div><p className="eyebrow">POSITIONS</p><h2>Capital at work</h2></div></div><div className="position-table">{positions.length ? positions.map(position => <div className="position-row" key={position.symbol}><span><b>{position.symbol}</b><small>{position.company_name}</small></span><span className="mono">{position.quantity}</span><span className="mono">{Number(position.average_price).toFixed(2)}</span><span className="mono">{Number(position.current_price).toFixed(2)}</span><span className="positive mono">+{Number(position.unrealized_pl).toFixed(2)}</span></div>) : <div className="empty-state"><p>No positions yet. Place a paper order to begin.</p></div>}</div></div><div className="panel performance-panel"><p className="eyebrow">ACCOUNT LEDGER</p><h2>Realized P&amp;L</h2><strong className="metric-number positive">NPR {Number(portfolio?.realized_pl || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong><p className="performance-note">All orders and cash movements are stored in the backend database.</p></div></div></section>
 }
 
@@ -137,7 +149,7 @@ function App() {
   const [clock, setClock] = useState('15:00:00')
   const [candles, setCandles] = useState([])
   const [authMode, setAuthMode] = useState(null)
-  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('nepse_user') || 'null'))
+  const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem('nepse_user') || 'null') } catch { localStorage.removeItem('nepse_user'); return null } })
 
   useEffect(() => {
     const timer = setInterval(() => setClock(new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Kathmandu' })), 1000)
@@ -156,18 +168,18 @@ function App() {
         <button className="menu-button" aria-label="Open navigation" onClick={() => setMenuOpen(!menuOpen)}><Menu size={20} /></button>
         <a className="brand" href="#top"><span className="brand-mark">N</span><span>NEPSE<span className="brand-slash">/</span></span><small>PAPER TRADER</small></a>
         <nav className={menuOpen ? 'main-nav open' : 'main-nav'}>{['Overview', 'Markets', 'Portfolio', 'Orders', ...(user?.role === 'ADMIN' ? ['Admin'] : [])].map(item => <button className={activeNav === item ? 'nav-active' : ''} key={item} onClick={() => { setActiveNav(item); setMenuOpen(false) }}>{item}</button>)}</nav>
-        <div className="top-actions"><button className="icon-button" aria-label="Search"><Search size={18} /></button><button className="icon-button" aria-label="Notifications"><Bell size={18} /><i /></button>{user ? <button className="avatar" aria-label="Log out" onClick={() => { localStorage.clear(); setUser(null); setActiveNav('Overview') }}>{user.username?.slice(0, 2).toUpperCase() || 'ME'}</button> : <><button className="auth-link" onClick={() => setAuthMode('login')}>Sign in</button><button className="primary-button compact-button" onClick={() => setAuthMode('register')}><UserPlus size={14} /> Join</button></>}</div>
+        <div className="top-actions"><button className="icon-button" aria-label="Search"><Search size={18} /></button><button className="icon-button" aria-label="Notifications"><Bell size={18} /><i /></button>{user ? <button className="avatar" aria-label="Log out" onClick={() => { localStorage.removeItem('nepse_access_token'); localStorage.removeItem('nepse_refresh_token'); localStorage.removeItem('nepse_user'); setUser(null); setActiveNav('Overview') }}>{user.username?.slice(0, 2).toUpperCase() || 'ME'}</button> : <><button className="auth-link" onClick={() => setAuthMode('login')}>Sign in</button><button className="primary-button compact-button" onClick={() => setAuthMode('register')}><UserPlus size={14} /> Join</button></>}</div>
       </header>
 
       <main id="top">{activeNav === 'Admin' && user?.role === 'ADMIN' ? <AdminPanel /> : activeNav === 'Markets' ? <MarketsPage onSelect={symbol => { setSelected(symbol); setActiveNav('Overview') }} /> : activeNav === 'Portfolio' ? <PortfolioPage user={user} /> : activeNav === 'Orders' ? <OrdersPage user={user} onSignIn={() => setAuthMode('login')} /> : <>
-        <section className="hero-intro reveal-one"><div><p className="eyebrow"><span className="pulse-dot" /> MARKET OPEN <span className="mono">{clock} NPT</span></p><h1>Trade the <span>mountains.</span></h1><p className="hero-copy">A focused paper-trading terminal for the Nepal Stock Exchange. Practice with NPR 1,000,000 in virtual capital.</p></div><button className="primary-button" onClick={() => setActiveNav('Markets')}><Sparkles size={16} /> Explore markets <ChevronDown size={15} /></button></section>
+        <section className="hero-intro reveal-one"><div><p className="eyebrow"><span className="pulse-dot" /> DEMO MARKET FEED <span className="mono">{clock} NPT</span></p><h1>Trade the <span>mountains.</span></h1><p className="hero-copy">A focused paper-trading terminal for the Nepal Stock Exchange. Practice with NPR 1,000,000 in virtual capital.</p></div><button className="primary-button" onClick={() => setActiveNav('Markets')}><Sparkles size={16} /> Explore markets <ChevronDown size={15} /></button></section>
 
-        <section className="metric-strip reveal-two"><div><span>Portfolio value</span><strong className="metric-number">NPR 1,024,680.00</strong><em className="positive"><ArrowUpRight size={14} /> 2.47% today</em></div><div><span>Available cash</span><strong className="metric-number">NPR 842,150.00</strong><small>82.2% buying power</small></div><div><span>Open positions</span><strong className="metric-number">08</strong><small>03 gaining today</small></div><div className="signature-metric"><span>Market pulse</span><strong><Activity size={17} /> Bullish</strong><small>NEPSE +0.38%</small></div></section>
+        <section className="metric-strip reveal-two"><div><span>Portfolio value</span><strong className="metric-number">Sign in to view</strong><small>Actual account data appears in Portfolio after authentication.</small></div><div><span>Available cash</span><strong className="metric-number">—</strong><small>Virtual buying power</small></div><div><span>Open positions</span><strong className="metric-number">—</strong><small>Persisted holdings</small></div><div className="signature-metric"><span>Market data mode</span><strong><Activity size={17} /> DEMO</strong><small>Simulated quotes only</small></div></section>
 
         <section className="workspace reveal-three"><div className="chart-panel panel"><div className="panel-heading"><div><p className="eyebrow">MARKET PULSE / {selected}</p><h2>{selected === 'NEPSE' ? 'NEPSE Index' : watchlist.find(item => item.symbol === selected)?.name}</h2></div><div className="chart-value"><strong className="metric-number">{selected === 'NEPSE' ? '2,118.47' : watchlist.find(item => item.symbol === selected)?.price}</strong><em className="positive">+8.02 <small>(+0.38%)</small></em></div></div><SkylineChart candles={candles} /><div className="chart-footer"><div className="range-tabs">{['1D', '1W', '1M', '3M', '1Y'].map(item => <button className={range === item ? 'selected-range' : ''} onClick={() => setRange(item)} key={item}>{item}</button>)}</div><span className="chart-legend"><i /> {candles.length ? 'API simulated OHLCV' : 'Simulated market data'} <CircleHelp size={14} /></span></div></div>
           <aside className="watch-panel panel"><div className="panel-heading compact"><div><p className="eyebrow">YOUR RADAR</p><h2>Watchlist</h2></div><button className="icon-button" onClick={() => setActiveNav('Markets')} aria-label="Filter watchlist"><SlidersHorizontal size={17} /></button></div><div className="watch-list">{watchlist.map(item => <button className={selected === item.symbol ? 'watch-row active-row' : 'watch-row'} key={item.symbol} onClick={() => setSelected(item.symbol)}><span className="company-badge">{item.symbol.slice(0, 1)}</span><span className="company-name"><b>{item.symbol}</b><small>{item.name}</small></span><span className="watch-price"><b className="mono">{item.price}</b><em className={item.direction}>{item.change}</em></span></button>)}</div><button className="text-button" onClick={() => setActiveNav('Markets')}>View all markets <ArrowUpRight size={15} /></button></aside></section>
 
-        <section className="lower-grid reveal-four"><div className="panel positions-panel"><div className="panel-heading compact"><div><p className="eyebrow">CAPITAL AT WORK</p><h2>Open positions</h2></div><button className="text-button" onClick={() => setActiveNav('Portfolio')}>Manage <ArrowUpRight size={15} /></button></div><div className="position-table"><div className="table-head"><span>ASSET</span><span>QTY</span><span>AVG. PRICE</span><span>LAST PRICE</span><span>DAY P&amp;L</span></div>{watchlist.slice(0, 3).map((item, index) => <div className="position-row" key={item.symbol}><span><b>{item.symbol}</b><small>{item.name}</small></span><span className="mono">{[120, 80, 45][index]}</span><span className="mono">{['521.40', '704.10', '634.20'][index]}</span><span className="mono">{item.price}</span><span className={item.direction === 'up' ? 'positive mono' : 'negative mono'}>{item.direction === 'up' ? '+' : '-'}{['3,216.00', '696.00', '279.00'][index]}</span></div>)}</div></div><div className="panel insight-panel"><div className="insight-icon"><Wallet size={19} /></div><p className="eyebrow">TRADER'S NOTE</p><h2>Consistency compounds.</h2><p>Your strongest session was Tuesday. You stayed inside your risk band and let the position breathe.</p><button className="secondary-button" onClick={() => setActiveNav('Orders')}>Review your orders <ArrowUpRight size={15} /></button></div></section>
+        <section className="lower-grid reveal-four"><div className="panel positions-panel"><div className="panel-heading compact"><div><p className="eyebrow">CAPITAL AT WORK</p><h2>Open positions</h2></div><button className="text-button" onClick={() => setActiveNav('Portfolio')}>Manage <ArrowUpRight size={15} /></button></div><div className="position-table"><div className="table-head"><span>ASSET</span><span>QTY</span><span>AVG. PRICE</span><span>LAST PRICE</span><span>DAY P&amp;L</span></div><div className="empty-state"><p>Sign in and open Portfolio to view your persisted positions and actual P&amp;L.</p></div></div></div><div className="panel insight-panel"><div className="insight-icon"><Wallet size={19} /></div><p className="eyebrow">TRADER'S NOTE</p><h2>Consistency compounds.</h2><p>Review your simulated orders, track your virtual positions, and compare your decisions over time. No real securities are traded.</p><button className="secondary-button" onClick={() => setActiveNav('Orders')}>Review your orders <ArrowUpRight size={15} /></button></div></section>
       </>}</main>
       <footer><span>NEPSE PAPER TRADER <i /> SIMULATION ONLY</span><span>Made by Rijan Adhikari <i /> <a className="contact-link" href="mailto:business.rijan.np@gmail.com">business.rijan.np@gmail.com</a></span><span><Settings2 size={14} /> System nominal</span></footer>
       {!user && <button className="floating-auth" onClick={() => setAuthMode('login')}><LogIn size={15} /> Sign in to trade</button>}

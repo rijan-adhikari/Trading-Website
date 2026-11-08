@@ -47,6 +47,13 @@ function Ticker({ items = [] }) {
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
 
+function clearStoredSession() {
+  localStorage.removeItem('nepse_access_token')
+  localStorage.removeItem('nepse_refresh_token')
+  localStorage.removeItem('nepse_user')
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('nepse:session-expired'))
+}
+
 async function apiRequest(path, options = {}) {
   const { token = localStorage.getItem('nepse_access_token'), body, headers = {}, ...requestOptions } = options
   const send = (accessToken) => fetch(API_BASE + path, {
@@ -57,7 +64,11 @@ async function apiRequest(path, options = {}) {
   let response
   try { response = await send(token) }
   catch { throw new Error('Cannot reach the API at ' + API_BASE + '. Check the API service and VITE_API_URL.') }
-  if (response.status === 401 && path !== '/auth/refresh' && localStorage.getItem('nepse_refresh_token')) {
+  if (response.status === 401 && path !== '/auth/refresh') {
+    if (!localStorage.getItem('nepse_refresh_token')) {
+      clearStoredSession()
+      throw new Error('Your session has expired. Please sign in again.')
+    }
     let refreshResponse
     try {
       refreshResponse = await fetch(API_BASE + '/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: localStorage.getItem('nepse_refresh_token') }) })
@@ -66,7 +77,7 @@ async function apiRequest(path, options = {}) {
     }
     const refreshed = await refreshResponse.json().catch(() => ({}))
     if (!refreshResponse.ok || !refreshed.data?.access_token) {
-      localStorage.removeItem('nepse_access_token'); localStorage.removeItem('nepse_refresh_token'); localStorage.removeItem('nepse_user')
+      clearStoredSession()
       throw new Error('Your session has expired. Please sign in again.')
     }
     localStorage.setItem('nepse_access_token', refreshed.data.access_token)
@@ -149,6 +160,12 @@ function App() {
   const [authMode, setAuthMode] = useState(null)
   const [user, setUser] = useState(() => { try { return JSON.parse(localStorage.getItem('nepse_user') || 'null') } catch { localStorage.removeItem('nepse_user'); return null } })
   const [dashboardPortfolio, setDashboardPortfolio] = useState(null)
+
+  useEffect(() => {
+    const handleSessionExpired = () => { setUser(null); setDashboardPortfolio(null); setActiveNav('Overview') }
+    window.addEventListener('nepse:session-expired', handleSessionExpired)
+    return () => window.removeEventListener('nepse:session-expired', handleSessionExpired)
+  }, [])
 
   useEffect(() => {
     const timer = setInterval(() => setClock(new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Kathmandu' })), 1000)

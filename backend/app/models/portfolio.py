@@ -48,10 +48,8 @@ class Position(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 
 class PortfolioSnapshot(UUIDPrimaryKeyMixin, Base):
-    """End-of-day (or on-demand) snapshot used to render the portfolio
-    performance chart without recomputing history from every trade.
-    Written by a scheduled job / the demo market engine tick, not by
-    user-facing routes.
+    """Reserved schema for future point-in-time portfolio history.
+    This release does not write snapshots or expose a snapshot-history API.
     """
     __tablename__ = "portfolio_snapshots"
 

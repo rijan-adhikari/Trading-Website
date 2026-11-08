@@ -13,10 +13,10 @@ A browser-based paper-trading MVP for learning the mechanics of NEPSE share trad
 - Simulated market list and generated five-minute candles for five sample symbols.
 - Immediate market BUY/SELL paper orders.
 - Weighted-average position cost basis, including simulated buy-side fees.
-- Sell-side fees deducted from realized proceeds and realized P&L.
+- Sell-side fees deducted from net proceeds and realized P&L.
 - Persisted orders, trades, transactions and audit log entries.
 - Basic admin user activation/suspension endpoints.
-- Docker Compose and Render Blueprint deployment definitions.
+- Docker Compose and a Render Blueprint using Neon PostgreSQL for free-tier deployment.
 
 ### Not implemented
 - Live NEPSE market data or a licensed data-provider integration.
@@ -35,7 +35,7 @@ The current simulator is an MVP and must not be marketed as a live-data or produ
 - **Authentication:** JWT, Argon2
 - **Frontend:** React + Vite
 - **Testing:** pytest, FastAPI TestClient
-- **Deployment:** Docker Compose and Render Blueprint
+- **Deployment:** Render Free web/static services + Neon Free PostgreSQL
 
 ## Repository layout
 
@@ -136,13 +136,13 @@ npm ci
 npm run build
 ```
 
-GitHub Actions runs backend tests and the frontend production build on pushes to `main` / `production-hardening` and pull requests targeting `main`.
+GitHub Actions runs backend tests, PostgreSQL migrations, dependency audits and the frontend production build on pushes to `main` / `production-hardening` and pull requests targeting `main`.
 
 ## Deployment
 
-See [docs/deployment.md](docs/deployment.md) for the Render Blueprint setup, required environment configuration and free-tier limitations.
+See [docs/deployment.md](docs/deployment.md) for the Render + Neon free deployment process. The Blueprint creates a free API web service and static frontend only. It deliberately does not create a Render database or any paid resource. You must create a Neon Free database and set the pooled PostgreSQL URL as the Render API's `DATABASE_URL` environment variable.
 
-The Blueprint currently uses Free Render Postgres to avoid creating a paid resource without approval. Free Postgres expires after 30 days, so upgrade to a paid database and verify backups before storing data for real users.
+Both providers' free tiers have sleep/compute/storage limitations. Keep database exports on your own computer; free hosting is not a substitute for backups.
 
 ## Trading assumptions
 

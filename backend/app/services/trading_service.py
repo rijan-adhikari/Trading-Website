@@ -70,23 +70,29 @@ class TradingService:
                 raise InsufficientFundsError()
             old_quantity = position.quantity if position else 0
             if position:
-                position.average_price = _money(((position.average_price * old_quantity) + (price * quantity)) / (old_quantity + quantity))
+                position.average_price = _money(((position.average_price * old_quantity) + total) / (old_quantity + quantity))
                 position.quantity += quantity
             else:
-                position = Position(portfolio_id=portfolio.id, stock_id=stock.id, quantity=quantity, average_price=price)
+                position = Position(
+                    portfolio_id=portfolio.id,
+                    stock_id=stock.id,
+                    quantity=quantity,
+                    average_price=_money(total / quantity),
+                )
                 self.db.add(position)
             portfolio.cash_balance = _money(portfolio.cash_balance - total)
             net = -total
         else:
             if position is None or position.quantity < quantity:
                 raise InsufficientSharesError()
-            realized_pl = _money((price - position.average_price) * quantity)
+            net = _money(gross - fees)
+            # Buy-side fees are part of cost basis; sell-side fees reduce proceeds.
+            realized_pl = _money(net - (position.average_price * quantity))
             position.quantity -= quantity
             if position.quantity == 0:
                 self.db.delete(position)
-            portfolio.cash_balance = _money(portfolio.cash_balance + gross - fees)
+            portfolio.cash_balance = _money(portfolio.cash_balance + net)
             portfolio.realized_pl = _money(portfolio.realized_pl + realized_pl)
-            net = _money(gross - fees)
 
         order = Order(user_id=user.id, stock_id=stock.id, side=side, order_type=order_type, quantity=quantity, executed_quantity=quantity, average_fill_price=price, status=OrderStatus.FILLED)
         self.db.add(order)

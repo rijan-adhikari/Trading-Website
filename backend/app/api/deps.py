@@ -47,7 +47,6 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
 
 
 def get_client_ip(request: Request) -> str | None:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    # Trust the ASGI peer address. Uvicorn's trusted proxy handling should
+    # rewrite this to the client IP behind Render; never parse raw XFF here.
     return request.client.host if request.client else None

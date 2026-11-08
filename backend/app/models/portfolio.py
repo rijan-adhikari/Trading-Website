@@ -12,7 +12,7 @@ MONEY = Numeric(18, 4)
 class Portfolio(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """One-per-user paper-trading account. `cash_balance` is the single
     source of truth for spendable virtual money; it is only ever mutated
-    inside OrderExecutionService's DB transaction, never set directly by
+    inside TradingService's database transaction, never set directly by
     an API route. `realized_pl` accumulates every SELL's realized P/L.
     """
     __tablename__ = "portfolios"
@@ -30,7 +30,7 @@ class Portfolio(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class Position(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """Open holding of one stock within a portfolio. Weighted-average cost
-    method (see docs/trading-engine.md): average_price is recomputed on
+    method: average_price is recomputed on
     every buy; sells reduce quantity without touching average_price.
     A position with quantity == 0 is deleted rather than kept at zero.
     """
@@ -48,10 +48,8 @@ class Position(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 
 class PortfolioSnapshot(UUIDPrimaryKeyMixin, Base):
-    """End-of-day (or on-demand) snapshot used to render the portfolio
-    performance chart without recomputing history from every trade.
-    Written by a scheduled job / the demo market engine tick, not by
-    user-facing routes.
+    """Reserved schema for future point-in-time portfolio history.
+    This release does not write snapshots or expose a snapshot-history API.
     """
     __tablename__ = "portfolio_snapshots"
 

@@ -1,7 +1,7 @@
 """
 Password hashing (Argon2) and JWT access/refresh token helpers.
 
-Nothing outside this module should call passlib or jose directly — route
+Nothing outside this module should call Argon2 or PyJWT directly — route
 handlers depend on `hash_password`, `verify_password`, `create_access_token`,
 `create_refresh_token`, and `decode_token`.
 """
@@ -9,23 +9,27 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 from uuid import UUID
 
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+import jwt
+from argon2 import PasswordHasher
+from argon2.exceptions import VerificationError
 
 from app.config import get_settings
 
 settings = get_settings()
 
-# Argon2 is the OWASP-recommended default for new applications.
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+# Argon2id is the password-hashing algorithm for this application.
+password_hasher = PasswordHasher()
 
 
 def hash_password(plain_password: str) -> str:
-    return pwd_context.hash(plain_password)
+    return password_hasher.hash(plain_password)
 
 
 def verify_password(plain_password: str, password_hash: str) -> bool:
-    return pwd_context.verify(plain_password, password_hash)
+    try:
+        return password_hasher.verify(password_hash, plain_password)
+    except VerificationError:
+        return False
 
 
 def _create_token(subject: str, expires_delta: timedelta, token_type: Literal["access", "refresh"]) -> str:
@@ -55,7 +59,7 @@ def decode_token(token: str, expected_type: Literal["access", "refresh"] = "acce
     """Returns the user_id encoded in the token, or raises InvalidTokenError."""
     try:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
-    except JWTError as exc:
+    except jwt.PyJWTError as exc:
         raise InvalidTokenError("Token is invalid or expired") from exc
 
     if payload.get("type") != expected_type:

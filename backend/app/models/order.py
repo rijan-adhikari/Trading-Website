@@ -9,10 +9,9 @@ MONEY = Numeric(18, 4)
 
 
 class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
-    """A user's buy/sell instruction. MARKET orders are validated and
-    executed synchronously by OrderExecutionService. LIMIT orders are
-    persisted PENDING and picked up by the demo market engine tick, which
-    executes them once the simulated price satisfies the limit condition.
+    """A user's buy/sell instruction. This release creates and fills MARKET
+    orders synchronously. LIMIT-related columns are reserved for future
+    functionality; there is no limit-order execution worker.
     """
     __tablename__ = "orders"
 

@@ -1,28 +1,23 @@
-databases:
-  - name: nepse-paper-trader-db
-    plan: free
-    databaseName: nepse_paper_trader
-    user: nepse
-
 services:
   - type: web
     name: nepse-paper-trader-api
     runtime: python
+    plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /health
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+    healthCheckPath: /ready
     envVars:
+      # Create a free Neon project and paste its pooled PostgreSQL URL here
+      # in the Render Dashboard. Do not commit the secret to Git.
       - key: DATABASE_URL
-        fromDatabase:
-          name: nepse-paper-trader-db
-          property: connectionString
+        sync: false
       - key: ENV
         value: production
+      - key: PYTHON_VERSION
+        value: 3.12.16
       - key: CORS_ORIGINS
-        sync: false
-      - key: SECRET_KEY
-        generateValue: true
+        value: https://nepse-paper-trader-web.onrender.com
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_ALGORITHM
@@ -44,7 +39,7 @@ services:
       - key: MARKET_CLOSE
         value: "15:00"
       - key: TRADING_DAYS
-        value: SUN,MON,TUE,WED,THU
+        value: MON,TUE,WED,THU,FRI
       - key: INITIAL_VIRTUAL_BALANCE
         value: "1000000"
       - key: BASE_CURRENCY
@@ -57,24 +52,18 @@ services:
         value: "0.015"
       - key: FEE_SETTLEMENT_PCT
         value: "0.01"
-      - key: DEMO_PRICE_VOLATILITY_PCT
-        value: "1.5"
-      - key: DEMO_TICK_INTERVAL_SECONDS
-        value: "5"
       - key: RATE_LIMIT_LOGIN
         value: 5/minute
       - key: RATE_LIMIT_REGISTER
         value: 3/minute
       - key: RATE_LIMIT_ORDERS
         value: 20/minute
-      - key: CREATE_DEMO_ACCOUNT
-        value: "false"
 
   - type: web
     name: nepse-paper-trader-web
     runtime: static
     rootDir: frontend
-    buildCommand: npm install && npm run build
+    buildCommand: npm ci && npm run build
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL

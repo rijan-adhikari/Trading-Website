@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, limiter
+from app.config import get_settings
 from app.database import get_db
 from app.models.order import Order
 from app.models.portfolio import Portfolio
@@ -20,7 +21,8 @@ def order_response(order: Order) -> OrderResponse:
 
 
 @router.post("/orders", response_model=SuccessResponse[OrderResponse], status_code=201)
-def create_order(payload: OrderCreateRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+@limiter.limit(get_settings().RATE_LIMIT_ORDERS)
+def create_order(payload: OrderCreateRequest, request: Request, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return SuccessResponse(data=order_response(TradingService(db).execute_market_order(user, payload.symbol, payload.side, payload.quantity, payload.order_type)))
 
 

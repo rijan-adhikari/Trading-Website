@@ -14,12 +14,36 @@ from app.config import get_settings
 
 settings = get_settings()
 
-engine = create_engine(
-    settings.DATABASE_URL,
-    pool_pre_ping=True,
-    connect_args={"check_same_thread": False} if settings.DATABASE_URL.startswith("sqlite") else {},
-    future=True,
-)
+
+def normalize_database_url(url: str) -> str:
+    """Normalize provider URLs before passing them to SQLAlchemy 2.x."""
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql://", 1)
+    return url
+
+
+database_url = normalize_database_url(settings.DATABASE_URL)
+is_sqlite = database_url.startswith("sqlite")
+
+engine_options = {
+    "pool_pre_ping": True,
+    "future": True,
+}
+if is_sqlite:
+    # SQLite's in-memory dialect uses SingletonThreadPool, which does not
+    # accept QueuePool sizing options.
+    engine_options["connect_args"] = {"check_same_thread": False}
+else:
+    # Keep the connection footprint small for Neon Free and Render Free.
+    # Neon suspends idle compute; pre-ping/recycle discard stale connections.
+    engine_options.update(
+        pool_size=2,
+        max_overflow=1,
+        pool_timeout=20,
+        pool_recycle=300,
+    )
+
+engine = create_engine(database_url, **engine_options)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, future=True)
 
